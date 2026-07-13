@@ -76,4 +76,3 @@ Um campo verdadeiramente opcional vazio não gera alerta por padrão. Qualquer m
 ## Fora do Milestone 2A
 
 O marco não cria classes, telas, navegação, APIs, persistência, segurança, backup ou exportação. O limite entre a documentação atual e a futura implementação Java está registrado no [ADR de abordagem da modelagem](../architecture/adr-001-domain-modeling-approach.md).
-
