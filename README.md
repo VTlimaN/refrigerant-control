@@ -15,7 +15,22 @@ O primeiro marco existe somente para confirmar que o ambiente de desenvolvimento
 - renderização de HTML com Thymeleaf;
 - serialização de JSON.
 
-Este marco não contém banco de dados, autenticação, regras de negócio, painel, cadastro de gases, cadastro de cilindros ou outras telas operacionais.
+O primeiro marco não continha banco de dados, autenticação, regras de negócio, painel, cadastro de gases, cadastro de cilindros ou outras telas operacionais.
+
+## Milestone 2B.1 — Fundações do domínio
+
+O Milestone 2B.1 adiciona um primeiro recorte do domínio como Java puro, sem dependência de Spring. O pacote `dev.sasser.refrigerantcontrol.domain` contém:
+
+- `Weight`, com valores em quilogramas representados por `BigDecimal` e igualdade numérica;
+- `SealNumber`, como identidade imutável do cilindro;
+- `RefrigerantGas`, limitado aos nomes operacionais atualmente confirmados;
+- `Cylinder`, com associação imutável ao refrigerante e registro separado do peso bruto inicial;
+- `UsageActivity` e `ActivityStatus`, com a transição determinística de `AWAITING_RETURN_WEIGHT` para `COMPLETED`;
+- `UsageActivityStarter`, que bloqueia uma segunda atividade pendente quando recebe a coleção completa de atividades relevantes.
+
+Os instantes são fornecidos explicitamente às operações do domínio. A futura camada de aplicação será responsável por obtê-los automaticamente; o domínio não consulta o relógio do sistema. Os novos testes usam JUnit diretamente, sem iniciar o contexto Spring.
+
+Esta etapa não implementa persistência, transações, unicidade global de lacres, interface operacional, catálogo técnico editável, cilindros `EMPTY` nem o restante do Milestone 2B. Essas capacidades continuam adiadas conforme as perguntas abertas na documentação do domínio.
 
 ## Tecnologias
 
@@ -57,6 +72,7 @@ O Tomcat já faz parte da aplicação por meio da dependência `spring-boot-star
 src/main/java/        Código Java da aplicação
 src/main/resources/   Configuração e templates
 src/test/java/        Testes automatizados
+docs/domain/           Requisitos e decisões canônicas do domínio
 .mvn/wrapper/         Configuração do Maven Wrapper
 target/               Resultado local da compilação, ignorado pelo Git
 ```
@@ -67,6 +83,7 @@ Arquivos importantes:
 - `mvnw.cmd`: Maven Wrapper para Windows.
 - `mvnw`: Maven Wrapper para Debian e outros sistemas compatíveis com POSIX.
 - `RefrigerantControlApplication.java`: ponto de entrada da aplicação.
+- `dev.sasser.refrigerantcontrol.domain`: fundamentos do domínio implementados em Java puro.
 - `application.properties`: nome visível da aplicação.
 - `home.html`: página inicial renderizada pelo Thymeleaf.
 - `AGENTS.md`: regras permanentes para futuras sessões do Codex.
@@ -214,16 +231,21 @@ Se uma segunda inicialização informar que a porta 8080 está ocupada, volte ao
 
 ## Limitações atuais
 
-Neste primeiro marco ainda não existem:
+No estado atual do projeto ainda não existem:
 
 - banco de dados;
 - autenticação ou usuários;
-- regras de consumo de gás;
+- persistência ou garantia transacional das regras do domínio;
+- garantia de unicidade global dos lacres fora de uma futura fronteira de aplicação;
 - dashboard;
-- cadastro de gases;
-- cadastro de cilindros;
-- atividades, histórico, relatórios, backup ou exportação.
+- controllers, formulários ou telas para operar gases, cilindros e atividades;
+- geração automática de instantes por uma camada de aplicação;
+- ciclo de cilindro vazio, correção, cancelamento ou importação;
+- histórico persistido, relatórios, backup ou exportação;
+- implementação completa do Milestone 2B.
 
 ## O que este marco ensina
 
-Ao concluir este marco, o desenvolvedor entende como Java, Maven, Spring Boot, Spring MVC, Thymeleaf e Tomcat trabalham juntos; como testes verificam o contexto, a página e o JSON; como produzir e executar um JAR; e como manter o mesmo projeto compatível com Windows e Debian.
+Ao concluir o primeiro marco, o desenvolvedor entende como Java, Maven, Spring Boot, Spring MVC, Thymeleaf e Tomcat trabalham juntos; como testes verificam o contexto, a página e o JSON; como produzir e executar um JAR; e como manter o mesmo projeto compatível com Windows e Debian.
+
+O Milestone 2B.1 acrescenta o aprendizado sobre objetos de valor, identidade de entidades, imutabilidade, `Optional`, igualdade de `BigDecimal`, transições de estado e testes unitários determinísticos sem Spring.
