@@ -1,51 +1,57 @@
-# Perguntas abertas e registro de decisões
+# Perguntas e registro de decisões
 
-Este documento registra decisões que exigem evidência humana. Os estados permitidos são `Aberta`, `Respondida` e `Adiada`. Uma pergunta marcada como bloqueadora impede a parte afetada do Milestone 2B até receber decisão final.
+Este documento registra decisões respondidas e perguntas que ainda exigem evidência humana. Os estados usados neste marco são `Respondida` e `Aberta`. Uma pergunta bloqueadora impede somente a parte afetada do Milestone 2B.
 
-A planilha original não estava disponível nesta sessão e não foi inspecionada. Ela deve ser revisada antes de implementar regras relacionadas a unidade, precisão, identificação, fórmulas, duplicidade, correção ou representação de atividades abertas.
+A planilha original não estava disponível nesta sessão e não foi inspecionada pelo Codex. As respostas deste marco usam confirmação do responsável operacional e resumo de análise externa da planilha. O arquivo ainda será necessário para migração e para assuntos que permanecem abertos.
+
+Existem 37 IDs: 18 com status `Respondida` e 19 com status `Aberta`.
 
 ## Pesos
 
 | ID | Área | Pergunta | Status | Recomendação atual | Evidência necessária | Responsável esperado | Impacto | Bloqueia o Milestone 2B? | Decisão final |
 |---|---|---|---|---|---|---|---|---|---|
-| <a id="oq-wgt-01"></a>OQ-WGT-01 | Peso | Qual unidade é usada? | Aberta | Não assumir unidade. | planilha, balança e procedimento operacional | responsável operacional | representação e mensagens | Sim, para `Weight` | — |
-| <a id="oq-wgt-02"></a>OQ-WGT-02 | Peso | Quantas casas decimais devem ser usadas, qual é a escala ou precisão operacional e qual regra de arredondamento deve ser aplicada? | Aberta | Preservar a precisão real, evitar `double` e não escolher arredondamento sem evidência. | especificação da balança, amostras da planilha e procedimento operacional de arredondamento | responsável operacional | `BigDecimal`, comparação, arredondamento e consumo zero | Sim, para `Weight` | — |
-| <a id="oq-wgt-03"></a>OQ-WGT-03 | Peso | O registro usa peso bruto ou líquido? | Aberta | Usar o conceito empregado pela operação, sem conversão inventada. | procedimento e exemplos reais | responsável operacional | significado de todos os pesos | Sim | — |
-| <a id="oq-wgt-04"></a>OQ-WGT-04 | Peso | Como a tara é tratada? | Aberta | Não adicionar tara ao modelo sem necessidade comprovada. | procedimento, cilindros e balança | responsável operacional | cálculo e cadastro do cilindro | Sim se o peso for líquido | — |
-| <a id="oq-wgt-05"></a>OQ-WGT-05 | Peso | Existe peso inicial no cadastro do cilindro e qual é sua origem? | Aberta | Registrar somente se for medido e operacionalmente confiável. | cadastro atual e exemplos | responsável operacional | primeira sugestão de saída | Sim para sugestão inicial | — |
-| <a id="oq-wgt-06"></a>OQ-WGT-06 | Peso | Recarga, transferência, manutenção, recalibração, correção manual, substituição ou desativação existem na operação e como alteram o peso conhecido? | Aberta | Não criar consumo fictício; avaliar registro próprio apenas com evidência. | procedimentos e casos reais | operação e manutenção | origem de `lastKnownWeight` | Sim para sugestão de peso | — |
-| <a id="oq-wgt-07"></a>OQ-WGT-07 | Peso | Qual diferença do último peso conhecido é relevante? | Aberta | Alerta confirmável, nunca bloqueio, após definir tolerância. | precisão da balança e exemplos | responsável operacional | `VAL-W-02` | Sim para esse alerta | — |
-| <a id="oq-wgt-08"></a>OQ-WGT-08 | Peso | O que caracteriza consumo excepcionalmente alto? | Aberta | Usar limiar validado, possivelmente contextual, sem inventar limite. | histórico e avaliação operacional | responsável operacional | `VAL-W-03` | Sim para esse alerta | — |
+| <a id="oq-wgt-01"></a>OQ-WGT-01 | Peso | Qual unidade é usada? | Respondida | Usar quilograma (`kg`). | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | responsável operacional | representação e mensagens | Não | Quilograma é a unidade operacional. |
+| <a id="oq-wgt-02"></a>OQ-WGT-02 | Peso | Qual é a resolução observada e como tratar representações com zeros finais? | Respondida | Usar `BigDecimal`, resolução de `0,01 kg` e equivalência numérica entre `15,14` e `15,140`; apresentação visual não é regra do domínio. | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | responsável operacional | comparação e consumo zero | Não para os aspectos respondidos; arredondamento está em OQ-WGT-09 | A escala textual não representa precisão física adicional. |
+| <a id="oq-wgt-03"></a>OQ-WGT-03 | Peso | O registro usa peso bruto ou líquido? | Respondida | Usar peso bruto do cilindro com o refrigerante restante. | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | responsável operacional | significado dos pesos | Não | Todo peso operacional é bruto. |
+| <a id="oq-wgt-04"></a>OQ-WGT-04 | Peso | Como a tara é tratada? | Respondida | Não subtrair tara; cada cilindro vazio tem peso diferente e não há valor universal. | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | responsável operacional | cálculo e cadastro | Não | Conteúdo líquido nominal, peso bruto e tara são distintos. |
+| <a id="oq-wgt-05"></a>OQ-WGT-05 | Peso | Quando o peso bruto inicial deve existir e qual é sua origem? | Respondida | Medir no recebimento e garantir o valor antes da primeira atividade; cadastro e medição podem ocorrer juntos ou separados. | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | responsável operacional | primeira sugestão e elegibilidade para uso | Não | `initialGrossWeight` pertence ao cilindro e não cria atividade. |
+| <a id="oq-wgt-06"></a>OQ-WGT-06 | Peso | Transferência, manutenção, recalibração ou correção manual existem e como alteram o peso conhecido? | Aberta | Não criar consumo fictício nem evento próprio sem evidência. Recarga foi excluída porque o cilindro não é recarregável. | procedimentos e casos reais | operação e manutenção | fontes adicionais de `lastKnownGrossWeight` | Sim somente para eventos adicionais | — |
+| <a id="oq-wgt-07"></a>OQ-WGT-07 | Peso | Qual diferença do último peso bruto conhecido é relevante? | Aberta | Alerta confirmável, nunca bloqueio, após definir tolerância. | exemplos reais e resolução da balança | responsável operacional | `VAL-W-02` | Sim para esse alerta | — |
+| <a id="oq-wgt-08"></a>OQ-WGT-08 | Peso | O que caracteriza consumo excepcionalmente alto? | Aberta | Não inventar limiar. | histórico e avaliação operacional | responsável operacional | `VAL-W-03` | Sim para esse alerta | — |
+| <a id="oq-wgt-09"></a>OQ-WGT-09 | Peso | Valores incompatíveis com incremento de `0,01 kg` devem ser rejeitados ou arredondados e, se arredondados, com qual modo? | Aberta | Preferir rejeição até decisão explícita; nunca arredondar silenciosamente. | procedimento de entrada e decisão operacional | operação e revisão técnica | `VAL-P-03` e construção de `Weight` | Sim | — |
+| <a id="oq-wgt-10"></a>OQ-WGT-10 | Peso | Qual é a capacidade máxima da balança? | Aberta | Não criar limite máximo sem especificação do equipamento. | identificação ou manual da balança | responsável operacional | eventual validação máxima | Não para o núcleo; sim para qualquer limite máximo | — |
 
 ## Cilindros e refrigerantes
 
 | ID | Área | Pergunta | Status | Recomendação atual | Evidência necessária | Responsável esperado | Impacto | Bloqueia o Milestone 2B? | Decisão final |
 |---|---|---|---|---|---|---|---|---|---|
-| <a id="oq-cyl-01"></a>OQ-CYL-01 | Cilindro | Cada cilindro possui identificação única confiável? | Aberta | Exigir identidade operacional antes de registrar atividades por cilindro. | etiquetas, cadastro e planilha | responsável operacional | identidade de `Cylinder` | Sim | — |
-| <a id="oq-cyl-02"></a>OQ-CYL-02 | Cilindro | A planilha registra cilindros ou somente tipos de gás? | Aberta | Priorizar cilindro se a operação conseguir identificá-lo. | inspeção da planilha e demonstração do fluxo | responsável operacional | seleção e migração futura | Sim | — |
-| <a id="oq-cyl-03"></a>OQ-CYL-03 | Relação | Um cilindro pode mudar de refrigerante? Em quais condições? | Aberta | Não permitir mudança livre sem procedimento e rastreabilidade. | procedimentos de limpeza, recarga e reuso | operação e manutenção | invariantes e reclassificação | Sim | — |
-| <a id="oq-cyl-04"></a>OQ-CYL-04 | Histórico | Como preservar o gás histórico: associação imutável, cópia na atividade ou relação com vigência? | Aberta | Escolher somente após responder se há reclassificação e qual auditoria é necessária. | casos reais, política operacional e necessidade de consulta histórica | responsável operacional e revisão técnica | relação entre as três entidades candidatas | Sim | — |
-| <a id="oq-cyl-05"></a>OQ-CYL-05 | Ciclo do cilindro | Como substituição ou desativação afeta atividades abertas e histórico? | Aberta | Preservar atividades e impedir novas operações quando apropriado. | casos reais e procedimento patrimonial | operação e manutenção | ciclo do cilindro | Sim se fizer parte do 2B | — |
+| <a id="oq-cyl-01"></a>OQ-CYL-01 | Cilindro | Cada cilindro possui identificação única confiável? | Respondida | Usar `sealNumber`, único, permanente e imutável. | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | responsável operacional | identidade de `Cylinder` | Não | O número do lacre identifica um cilindro. |
+| <a id="oq-cyl-02"></a>OQ-CYL-02 | Cilindro | A planilha distingue cilindros ou somente tipos de gás? | Respondida | Os lacres distinguem cilindros; linhas sem retorno ainda podem ser ambíguas para importação. | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | responsável operacional | seleção e migração | Não para identidade; importação exige revisão humana | O cilindro é a seleção operacional principal. |
+| <a id="oq-cyl-03"></a>OQ-CYL-03 | Relação | Um cilindro pode mudar de refrigerante? | Respondida | Não. O cilindro não é recarregável e a associação é imutável. | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | operação e manutenção | invariantes | Não | Alteração de refrigerante é proibida. |
+| <a id="oq-cyl-04"></a>OQ-CYL-04 | Histórico | Como preservar o gás histórico? | Respondida | Derivar o gás da associação imutável do cilindro. | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | responsável operacional e revisão técnica | relação entre entidades | Não | Snapshot e vigência temporal não são necessários. |
+| <a id="oq-cyl-05"></a>OQ-CYL-05 | Ciclo do cilindro | Como representar um cilindro que ficou sem refrigerante utilizável? | Respondida | Usar ciclo candidato `ACTIVE`/`EMPTY`; marcar manualmente, preservar peso final e histórico e impedir novos usos. | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | operação e manutenção | `CylinderStatus` | Não para o ciclo mínimo; conflito com atividade pendente está em OQ-CYL-06 | Não criar etapa de descarte físico no MVP. |
+| <a id="oq-cyl-06"></a>OQ-CYL-06 | Ciclo do cilindro | Como marcar o cilindro vazio quando ainda existe atividade sem peso de retorno? | Aberta | Não concluir atividade nem reutilizar o peso automaticamente. | casos reais e procedimento operacional | responsável operacional | UC-13 e `VAL-P-04` | Sim para essa transição | — |
 
 ## Atividades
 
 | ID | Área | Pergunta | Status | Recomendação atual | Evidência necessária | Responsável esperado | Impacto | Bloqueia o Milestone 2B? | Decisão final |
 |---|---|---|---|---|---|---|---|---|---|
-| <a id="oq-act-01"></a>OQ-ACT-01 | Atividade | Um cilindro pode ter mais de uma atividade aberta? O que significa “incompatível”? | Aberta | Permitir no máximo uma atividade aberta por cilindro até evidência contrária. | situações reais de uso simultâneo | responsável operacional | disponibilidade e `VAL-B-05` | Sim | — |
+| <a id="oq-act-01"></a>OQ-ACT-01 | Atividade | Um cilindro pode ter mais de uma atividade sem peso de retorno? | Respondida | Não permitir nova atividade até registrar o retorno da anterior. | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | responsável operacional | disponibilidade e `VAL-B-05` | Não | Sem pesagem intermediária, o consumo não pode ser atribuído corretamente. |
 | <a id="oq-act-02"></a>OQ-ACT-02 | Atividade | Quais campos mínimos identificam uma atividade no histórico? | Aberta | Usar identidade própria interna sem expor campo adicional no formulário. | consultas atuais e planilha | operação e revisão técnica | identidade de `UsageActivity` | Sim para implementação completa | — |
-| <a id="oq-act-03"></a>OQ-ACT-03 | Local | Local é texto livre ou existe padrão operacional estável? | Aberta | Manter atributo simples; sugestões não criam entidade. | valores reais da planilha | responsável operacional | validação e pesquisa | Não para núcleo inicial | — |
+| <a id="oq-act-03"></a>OQ-ACT-03 | Local | O local opcional é texto livre ou possui padrão estável? | Aberta | Manter atributo opcional simples; sugestões não criam entidade. | valores reais e necessidade de pesquisa | responsável operacional | consulta e sugestões | Não para o núcleo | — |
+| <a id="oq-act-04"></a>OQ-ACT-04 | Atividade | Criar diretamente em `COMPLETED` pertence ao fluxo normal? | Respondida | Não. Restringir a importação, correção histórica ou recuperação controlada futura. | confirmação operacional na revisão e contexto do resumo da análise externa; planilha indisponível nesta sessão | responsável do produto | UC-03 e política temporal | Não para o fluxo normal; exceção depende de OQ-DAT-05, OQ-DAT-06 e OQ-COR-01 | Não inventar instantes históricos. |
 
 <a id="datas-e-tempo"></a>
 ## Datas e tempo
 
 | ID | Área | Pergunta | Status | Recomendação atual | Evidência necessária | Responsável esperado | Impacto | Bloqueia o Milestone 2B? | Decisão final |
 |---|---|---|---|---|---|---|---|---|---|
-| <a id="oq-dat-01"></a>OQ-DAT-01 | Datas | Saída e retorno podem ocorrer em datas diferentes? | Aberta | Representar a diferença se ela for operacionalmente relevante. | exemplos de atividades abertas | responsável operacional | campos e ciclo de vida | Sim | — |
-| <a id="oq-dat-02"></a>OQ-DAT-02 | Datas | A pessoa precisa informar a data de retorno? | Aberta | Não adicionar campo visível se o instante automático atender à operação. | necessidade de relatórios e casos reais | responsável operacional | conclusão da atividade | Sim | — |
-| <a id="oq-dat-03"></a>OQ-DAT-03 | Auditoria | Um instante automático de conclusão é suficiente? | Aberta | Registrar instante técnico automaticamente e separar de data operacional. | requisitos de consulta e rastreabilidade | operação e revisão técnica | auditoria | Sim para instantes de auditoria do Milestone 2B, se incluídos | — |
-| <a id="oq-dat-04"></a>OQ-DAT-04 | Datas | Qual fuso horário define “hoje”? | Aberta | Definir explicitamente o fuso operacional; não depender da máquina. | local de operação e política futura | responsável do produto | valor padrão e validações | Sim para regras relativas a hoje | — |
-| <a id="oq-dat-05"></a>OQ-DAT-05 | Datas | Datas operacionais futuras são permitidas? | Aberta | Não decidir classificação sem caso operacional. | planilha e procedimento | responsável operacional | `VAL-P-01` | Sim para essa validação | — |
-| <a id="oq-dat-06"></a>OQ-DAT-06 | Datas | Quando uma data passada exige confirmação? | Aberta | Evitar alertar datas passadas legítimas; definir condição objetiva. | frequência de lançamentos retroativos | responsável operacional | `VAL-W-04` | Sim para esse alerta | — |
+| <a id="oq-dat-01"></a>OQ-DAT-01 | Tempo | Saída e pesagem de retorno podem ocorrer em dias diferentes? | Respondida | Sim; representar os fatos por `startedAt` e `completedAt`. | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | responsável operacional | ciclo de vida | Não | A ausência de retorno pode atravessar dias. |
+| <a id="oq-dat-02"></a>OQ-DAT-02 | Tempo | A pessoa precisa informar data ou hora de retorno no fluxo normal? | Respondida | Não; registrar `completedAt` automaticamente ao informar o peso. | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | responsável operacional | conclusão | Não | Nenhum campo temporal manual normal. |
+| <a id="oq-dat-03"></a>OQ-DAT-03 | Auditoria | Instantes automáticos atendem ao fluxo normal? | Respondida | Sim; produzir `startedAt`, `completedAt`, `correctedAt`, `cancelledAt` e `markedEmptyAt` nos eventos correspondentes. | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | operação e revisão técnica | rastreabilidade | Não para o fluxo normal | Exceções históricas permanecem abertas. |
+| <a id="oq-dat-04"></a>OQ-DAT-04 | Tempo | Qual fuso define exibição e data civil? | Respondida | Usar `America/Sao_Paulo`. | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | responsável do produto | exibição e derivação local | Não | Não depender do fuso da máquina. |
+| <a id="oq-dat-05"></a>OQ-DAT-05 | Exceções temporais | Como tratar valores futuros em importação ou correção histórica? | Aberta | Não se aplica ao fluxo normal; não decidir sem casos reais. | dados legados e política de correção | responsável operacional | `VAL-P-01` | Sim somente para operações excepcionais | — |
+| <a id="oq-dat-06"></a>OQ-DAT-06 | Exceções temporais | Quando valor passado informado em importação ou correção exige confirmação? | Aberta | Não alertar automaticamente sem condição objetiva. | dados legados e casos de correção | responsável operacional | `VAL-P-01` | Sim somente para operações excepcionais | — |
 
 ## Validação, correção e cancelamento
 
@@ -61,26 +67,25 @@ A planilha original não estava disponível nesta sessão e não foi inspecionad
 
 | ID | Área | Pergunta | Status | Recomendação atual | Evidência necessária | Responsável esperado | Impacto | Bloqueia o Milestone 2B? | Decisão final |
 |---|---|---|---|---|---|---|---|---|---|
-| <a id="oq-opt-01"></a>OQ-OPT-01 | Campos opcionais | Com que frequência ordem de serviço, técnico, observações, horários e detalhes são realmente usados? | Aberta | Manter fora do MVP e não alertar ausência até comprovação. | amostra da planilha e entrevistas | responsável operacional | escopo e simplicidade | Não para núcleo | — |
+| <a id="oq-opt-01"></a>OQ-OPT-01 | Campos opcionais | Quais informações ficam fora do fluxo obrigatório? | Respondida | Local, ordem de serviço, técnico e observações são opcionais; horários normais são automáticos; ausência não alerta. | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | responsável operacional | escopo e simplicidade | Não | Usar divulgação progressiva. |
 | <a id="oq-adm-01"></a>OQ-ADM-01 | Backup | Qual formato, destino, frequência e verificação são necessários para backup? | Aberta | Não escolher infraestrutura antes do requisito. | rotina atual e necessidade de restauração | responsável do produto | caso de uso de backup | Não para domínio puro; sim para futuro backup | — |
 | <a id="oq-adm-02"></a>OQ-ADM-02 | Exportação | Qual formato, conteúdo e finalidade são necessários para exportação? | Aberta | Definir pelo consumidor real dos dados. | exemplos de uso e arquivos esperados | responsável do produto | caso de uso de exportação | Não para domínio puro; sim para futura exportação | — |
 | <a id="oq-aud-01"></a>OQ-AUD-01 | Autoria | Como registrar autoria enquanto não existe autenticação? | Aberta | Documentar a limitação e não criar segurança neste marco. | necessidade real de atribuição | responsável do produto | rastreabilidade | Não para núcleo do 2B | — |
-| <a id="oq-cat-01"></a>OQ-CAT-01 | Catálogo | Quais campos mínimos e fontes técnicas são confiáveis, e quem os mantém? | Aberta | MVP com identificação mínima; catálogo ampliado somente com fonte responsável. | normas, fabricantes e responsável técnico | responsável técnico do catálogo | `RefrigerantGas` e confiabilidade | Sim para catálogo ampliado; não para conceito mínimo | — |
+| <a id="oq-cat-01"></a>OQ-CAT-01 | Catálogo | Quais campos ampliados, fontes técnicas e responsáveis são confiáveis? | Aberta | Catálogo ampliado somente com fonte responsável. | normas, fabricantes e responsável técnico | responsável técnico do catálogo | confiabilidade técnica | Sim para catálogo ampliado; não para conceito mínimo | — |
+| <a id="oq-cat-02"></a>OQ-CAT-02 | Catálogo operacional | Como preservar os nomes usados nos cilindros? | Respondida | Manter exatamente `R410A`, `R32`, `R-22`, `R407C`, `R134A`, `R404` e `141B`, sem renomeação automática. | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | responsável operacional | `operationalName` | Não | Descrições técnicas futuras não substituem o rótulo. |
 
-## Evidências a obter na planilha
+## Evidências ainda necessárias
 
-Antes das partes afetadas do Milestone 2B, revisar:
+Antes das partes afetadas do Milestone 2B ou de funcionalidades posteriores, confirmar:
 
-- nomes, ordem e significado das colunas;
-- formato, precisão e exemplos de peso;
-- fórmulas existentes, sem presumir que estejam corretas;
-- presença de identificadores de cilindro;
-- forma de representar saídas ainda sem retorno;
-- datas vazias, retroativas ou futuras;
-- padrões reais de gases e locais;
-- duplicidades, sobrescritas, correções e exclusões;
-- frequência dos campos opcionais;
-- volume e período do histórico;
-- usos atuais de filtro, backup e exportação.
+- valores incompatíveis com `0,01 kg`, capacidade da balança e tolerâncias;
+- transferência, manutenção, recalibração e correção manual de peso;
+- consumo alto e duplicidade;
+- identidade interna da atividade e formato do local opcional;
+- políticas de correção, cancelamento, exclusão e autoria;
+- tratamento temporal de importações e correções históricas;
+- marcação como vazio com atividade sem retorno;
+- formatos de backup e exportação;
+- fontes do catálogo técnico.
 
-Uma resposta só muda para `Respondida` quando a decisão final e sua evidência forem registradas. `Adiada` exige justificativa e não autoriza implementar a parte bloqueada.
+Na migração, linhas com saída e sem retorno devem ser classificadas manualmente como peso inicial ou atividade. Nenhuma resposta autoriza implementação Java neste marco.

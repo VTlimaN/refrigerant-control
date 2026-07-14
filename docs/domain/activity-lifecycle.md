@@ -1,76 +1,76 @@
 # Ciclo de vida da atividade
 
-Uma `UsageActivity` representa todo o fluxo de saída e retorno. Os estados não criam entidades diferentes.
+Uma `UsageActivity` representa o fluxo completo iniciado na saída. O registro do retorno altera o estado da mesma atividade, sem criar uma entidade diferente.
 
 ## Estados candidatos
 
 | Estado | Campos obrigatórios | Campos ausentes ou indisponíveis | Valor derivado |
 |---|---|---|---|
-| `AWAITING_RETURN` | cilindro, `departureWeight`, local e data de saída | `returnWeight` ausente; `consumedQuantity` indisponível | nenhum consumo |
-| `COMPLETED` | cilindro, `departureWeight`, `returnWeight`, local e datas operacionais aprovadas | nenhum peso pode estar ausente | `consumedQuantity = departureWeight - returnWeight` |
-| `CANCELLED` | dados históricos anteriores e motivo de cancelamento, se o estado for aprovado | excluído dos cálculos normais | nenhum novo consumo válido |
+| `AWAITING_RETURN_WEIGHT` | cilindro, `departureGrossWeight`, `startedAt` | `returnGrossWeight` e `completedAt` ausentes; `consumedQuantity` indisponível | nenhum consumo |
+| `COMPLETED` | cilindro, `departureGrossWeight`, `returnGrossWeight` e evidência temporal coerente com a origem; no fluxo normal, `startedAt` e `completedAt` | nenhum peso operacional ausente | `consumedQuantity = departureGrossWeight - returnGrossWeight` |
+| `CANCELLED` | dados anteriores e motivo, se o estado for aprovado | excluído dos cálculos normais | nenhum novo consumo válido |
 
-Qualquer combinação contrária à tabela é um erro bloqueante do domínio. `CANCELLED` ainda não é decisão final: pode ser substituído por uma operação auditável de invalidação.
+Local, ordem de serviço, técnico e observações são opcionais em qualquer estado. Combinações contrárias à tabela são erros bloqueantes. `CANCELLED` continua candidato e pode ser substituído por invalidação auditável.
 
-## Transições candidatas
+## Fluxo operacional normal
+
+### Registrar saída
+
+- **Origem:** atividade inexistente.
+- **Precondições:** cilindro existente em `ACTIVE`, peso inicial válido antes do primeiro uso, nenhuma atividade do mesmo cilindro sem retorno e peso bruto de saída válido.
+- **Efeito automático:** produzir `startedAt`.
+- **Resultado:** `AWAITING_RETURN_WEIGHT`.
+- **Valor derivado:** consumo indisponível.
+
+### Registrar pesagem de retorno
+
+- **Origem:** `AWAITING_RETURN_WEIGHT`.
+- **Precondições:** peso bruto de retorno presente, não negativo e não superior ao peso bruto de saída.
+- **Efeito automático:** produzir `completedAt`.
+- **Resultado:** `COMPLETED` na mesma `UsageActivity`.
+- **Valor derivado:** consumo calculável.
+
+A ausência de `returnGrossWeight` é o único fato conhecido. Ela não demonstra se o serviço ainda ocorre ou se apenas falta pesar o cilindro.
+
+## Operações excepcionais
 
 ### Criação diretamente como concluída
 
-- **Origem:** atividade ainda não registrada.
-- **Precondições:** cilindro existente; ausência de conflito aberto conforme política a aprovar; pesos, local e data válidos; alertas confirmados quando aplicáveis.
-- **Resultado:** `COMPLETED`.
-- **Efeito:** consumo torna-se calculável.
+Não pertence ao fluxo normal. Pode existir futuramente somente para importação legada, correção histórica ou recuperação controlada de uma atividade não registrada na saída.
 
-### Criação aguardando retorno
+- **Precondições:** política excepcional aprovada, origem dos dados identificada, ambos os pesos válidos e tratamento temporal definido.
+- **Resultado candidato:** `COMPLETED`.
+- **Restrição:** não usar o instante de importação como se fosse o início real da atividade.
 
-- **Origem:** atividade ainda não registrada.
-- **Precondições:** cilindro existente; ausência de conflito aberto conforme política a aprovar; saída, local e data válidos; retorno não informado.
-- **Resultado:** `AWAITING_RETURN`.
-- **Efeito:** consumo permanece indisponível.
+A restrição ao fluxo excepcional está respondida em [OQ-ACT-04](open-questions.md#oq-act-04). O tratamento temporal e de correção permanece aberto em [OQ-DAT-05](open-questions.md#oq-dat-05), [OQ-DAT-06](open-questions.md#oq-dat-06) e [OQ-COR-01](open-questions.md#oq-cor-01).
 
-### Conclusão de atividade aberta
+### Cancelamento ou correção
 
-- **Origem:** `AWAITING_RETURN`.
-- **Precondições:** retorno presente, não negativo e não superior à saída; data de retorno válida caso venha a ser exigida; alertas confirmados quando aplicáveis.
-- **Resultado:** `COMPLETED` na mesma `UsageActivity`.
-- **Efeito:** consumo passa a ser calculável.
-
-### Cancelamento de atividade aberta
-
-- **Origem:** `AWAITING_RETURN`.
-- **Precondições:** política de cancelamento aprovada e motivo informado.
-- **Resultado:** `CANCELLED` ou registro de invalidação, conforme decisão futura.
-- **Efeito:** informações anteriores permanecem preservadas e a atividade não participa do consumo normal.
-
-### Correção ou invalidação de atividade concluída
-
-- **Origem:** `COMPLETED`.
-- **Precondições:** política aprovada, motivo quando obrigatório e novos valores válidos.
-- **Resultado:** não definido até a escolha da política de correção e cancelamento.
-- **Efeito necessário:** valores anteriores e instantes de auditoria não podem desaparecer silenciosamente.
+- Uma atividade em `AWAITING_RETURN_WEIGHT` ou `COMPLETED` só pode ser corrigida ou invalidada por política futura explícita.
+- Valores anteriores e instantes de auditoria não podem desaparecer silenciosamente.
+- `correctedAt` e `cancelledAt` são produzidos automaticamente quando essas operações forem aprovadas.
 
 ## Transições inválidas
 
-- concluir sem retorno;
-- manter retorno ou consumo em `AWAITING_RETURN`;
+- iniciar nova atividade para o mesmo cilindro enquanto outra não possui `returnGrossWeight`;
+- concluir sem `returnGrossWeight`;
+- manter retorno, `completedAt` ou consumo em `AWAITING_RETURN_WEIGHT`;
 - concluir quando o retorno supera a saída;
 - registrar consumo independente dos pesos;
-- mudar uma atividade concluída para aberta sem política explícita;
-- alterar ou retirar cancelamento sem política aprovada;
+- reabrir atividade concluída sem política explícita;
 - confirmar um alerta para contornar erro bloqueante.
 
-## Datas e instantes
+## Instantes e data civil
 
-A data de saída é informação operacional. A necessidade de uma data de retorno informada pela pessoa permanece aberta. Criação, conclusão, correção e cancelamento podem produzir instantes técnicos automáticos, sem ocupar o formulário normal.
+`startedAt` e `completedAt` são automáticos no fluxo normal e provavelmente usam `Instant`. `America/Sao_Paulo` converte esses instantes para exibição e para a data civil derivada. Nenhuma data ou hora é digitada obrigatoriamente no fluxo normal.
 
-As decisões sobre datas diferentes, fuso, futuro e datas passadas estão em [Perguntas abertas](open-questions.md#datas-e-tempo).
+`LocalDate` pode ser necessário somente em importação ou correção excepcional quando a fonte não contém instante completo. As classificações de valores passados ou futuros nesses fluxos permanecem em [Perguntas abertas](open-questions.md#datas-e-tempo).
 
 ## Decisões abertas
 
-- cancelamento em `ActivityStatus` ou operação de invalidação;
-- possibilidade e mecanismo de correção de concluída;
-- proibição definitiva de reabertura;
-- data de retorno manual ou somente instante automático;
-- tratamento de atividade aberta quando o cilindro é desativado ou substituído.
+- cancelamento em `ActivityStatus` ou invalidação separada;
+- mecanismo de correção e eventual reabertura;
+- tratamento temporal de importações e correções históricas;
+- marcação do cilindro como vazio enquanto existe atividade sem peso de retorno.
 
 As políticas canônicas relacionadas estão em [Regras de negócio](business-rules.md#correcao-cancelamento-e-exclusao).
