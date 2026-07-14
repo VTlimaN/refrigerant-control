@@ -1,78 +1,102 @@
 # Escopo do MVP
 
-O produto segue o princípio **“Completo por dentro, simples por fora.”** O fluxo diário deve permanecer curto, enquanto validação, consistência e rastreabilidade protegem os dados internamente.
+O produto segue o princípio **“Completo por dentro, simples por fora.”** O fluxo diário deve exigir somente o que a operação precisa naquele momento, enquanto regras, estados e rastreabilidade protegem os dados internamente.
 
-Este documento classifica capacidades do produto. O Milestone 2A apenas documenta o domínio; não implementa os itens classificados como MVP.
+Este documento classifica capacidades do produto. O Milestone 2A.1 registra decisões; não implementa os itens classificados como MVP.
 
-## Fluxo operacional principal
+## Fluxo operacional normal
 
-O formulário normal terá no máximo cinco campos obrigatórios visíveis:
+### Registrar saída
 
-1. cilindro ou seleção operacional equivalente ainda a confirmar;
-2. peso de saída;
-3. peso de retorno, obrigatório somente para salvar diretamente como concluída;
-4. local da atividade;
-5. data da atividade.
+Informações visíveis obrigatórias:
 
-A data será sugerida como a data corrente e continuará editável. O peso de retorno não será exigido ao registrar uma saída que ficará aguardando retorno. Informações opcionais não ocuparão espaço permanente no fluxo principal.
+1. cilindro ou número do lacre;
+2. peso bruto de saída.
+
+O sistema registra `startedAt` automaticamente. O refrigerante vem da associação imutável do cilindro. Local, ordem de serviço, técnico e observações podem aparecer em “Mais informações”, sem alerta quando ausentes.
+
+### Registrar pesagem de retorno
+
+Nova informação visível obrigatória:
+
+1. peso bruto de retorno.
+
+O sistema registra `completedAt`, calcula `consumedQuantity` e conclui a mesma atividade. A data civil exibida é derivada dos instantes usando `America/Sao_Paulo`.
+
+Uma criação diretamente em `COMPLETED` não pertence ao fluxo normal. Ela fica restrita a futura importação legada, correção histórica ou recuperação controlada, sem inventar instantes do fato original.
 
 ## Classificação por área
 
 | Área | MVP do produto | Futuro | Não justificado sem requisito confirmado |
 |---|---|---|---|
-| Atividade operacional | Registrar saída, registrar retorno, concluir atividade, calcular consumo, informar local e data, listar atividades abertas e consultar histórico | Conveniências baseadas em frequência de uso depois que houver dados confiáveis | Dois conceitos ou fluxos independentes para atividade aberta e concluída |
-| Cilindro | Cadastro mínimo, identificação, associação com refrigerante e consulta do último peso conhecido | Tratamento próprio para eventos de peso não relacionados a consumo, se a operação confirmar sua existência | Estado de disponibilidade duplicado quando puder ser derivado das atividades |
-| Gás refrigerante | Cadastro mínimo que permita identificar o refrigerante | Catálogo técnico enriquecido com composição, segurança, cuidados, referências e manutenção de fontes | Solicitar informações técnicas durante o registro operacional |
-| Histórico | Pesquisa e consulta, identificação de registros abertos, correção e cancelamento segundo política aprovada | Auditoria com autoria após existir uma necessidade de identidade de usuário | Exclusão física como operação normal |
-| Proteção de dados | Backup e exportação conforme formatos ainda a confirmar | Importação e rotinas administrativas ampliadas | Escolher formatos ou infraestrutura sem requisito operacional |
-| Automação | Data corrente, cálculo de consumo, sugestão segura do último peso conhecido, preservação dos dados após erro e operação eficiente por teclado | Locais recentes, lembrança da última seleção e ordenação por frequência | Decisões automáticas irreversíveis |
+| Atividade operacional | Registrar saída, aguardar pesagem, registrar retorno, calcular consumo, listar pendências e consultar histórico | Importação, correção histórica e recuperação controlada diretamente como concluída | Formulários independentes ou entidades diferentes para cada estado |
+| Cilindro | `sealNumber`, refrigerante imutável, peso bruto inicial antes do primeiro uso, ciclo `ACTIVE`/`EMPTY` e marcação manual como vazio | Eventos adicionais de peso se confirmados | Fluxo separado para descarte físico ou disponibilidade booleana duplicada |
+| Gás refrigerante | Preservar o nome operacional e permitir associação com cilindros | Catálogo técnico com fontes confiáveis | Renomear automaticamente rótulos operacionais ou exigir catálogo durante a atividade |
+| Histórico | Pesquisa, consulta, identificação de atividades sem retorno e políticas futuras de correção/cancelamento | Auditoria com autoria após requisito de identidade | Exclusão física como operação normal |
+| Proteção de dados | Backup e exportação conforme formatos a decidir | Importação com classificação manual de linhas ambíguas | Escolher formato ou infraestrutura sem consumidor confirmado |
+| Automação | Instantes automáticos, consumo derivado e sugestão segura de `lastKnownGrossWeight` | Locais recentes e ordenação por frequência | Arredondamento, classificação de importação ou outra decisão irreversível automática |
+
+Os [treze casos de uso](use-cases.md) descrevem essas capacidades sem antecipar telas ou infraestrutura.
 
 ## Separação dos dados
 
 ### Dados da atividade operacional
 
-- cilindro selecionado;
-- peso de saída;
-- peso de retorno, quando disponível;
-- local;
-- data ou datas operacionais conforme decisão pendente;
-- estado da atividade;
-- confirmações excepcionais e rastreabilidade interna quando aplicáveis.
+- cilindro;
+- `departureGrossWeight`;
+- `returnGrossWeight`, quando registrado;
+- `startedAt` e `completedAt`;
+- `ActivityStatus`;
+- local, ordem de serviço, técnico e observações opcionais;
+- confirmações e rastreabilidade quando aplicáveis.
 
 ### Dados do cilindro
 
-- identidade operacional ainda a confirmar;
-- associação com gás refrigerante;
-- situação histórica da associação, ainda em decisão;
-- informações necessárias para estabelecer o último peso conhecido, caso confirmadas pela operação.
+- `sealNumber` único e permanente;
+- associação imutável com `RefrigerantGas`;
+- `initialGrossWeight`, que deve existir antes da primeira atividade;
+- `finalGrossWeight` e `markedEmptyAt` quando marcado vazio;
+- `CylinderStatus` candidato;
+- `nominalNetContent`, somente se houver necessidade de registrar o valor do rótulo.
+
+O cadastro de lacre e refrigerante pode ocorrer antes da medição inicial. Registrar `initialGrossWeight` depois, mas antes do primeiro uso, não cria uma atividade fictícia nem exige uma entidade adicional.
 
 ### Dados do catálogo de refrigerantes
 
-- nome padronizado;
-- descrição e aplicações;
-- composição e classe de segurança;
-- características, cuidados e armazenamento;
-- referências técnicas confiáveis.
+- `operationalName`, preservado exatamente;
+- descrição e aplicações futuras;
+- composição, segurança, cuidados e armazenamento futuros;
+- referências técnicas confiáveis ainda abertas.
 
-Somente a identificação mínima do gás pertence ao MVP inicial. Os dados técnicos ficam fora do formulário operacional.
+Os dados técnicos ficam fora do fluxo operacional.
 
 ### Funções administrativas
 
-Backup, exportação, eventual importação, usuários e configurações pertencem a uma área secundária. Backup e exportação fazem parte do MVP, mas seus formatos permanecem em aberto. Autenticação, autorização e importação não pertencem ao Milestone 2A nem ao Milestone 2B.
+Backup, exportação, futura importação, usuários e configurações pertencem a uma área secundária. Backup e exportação fazem parte do MVP, mas seus formatos permanecem abertos. Autenticação, autorização e código de importação não pertencem a este marco.
 
 ## Informações opcionais
 
-| Informação | Classificação inicial | Motivo |
+| Informação | Classificação | Regra |
 |---|---|---|
-| Ordem de serviço | Futuro | Depende de frequência e necessidade operacional comprovadas. |
-| Técnico | Futuro | Não há requisito confirmado nem autenticação para estabelecer autoria. |
-| Observações | Futuro | Pode aumentar a entrada de dados sem benefício demonstrado. |
-| Horários de saída e retorno | Futuro | Datas e instantes necessários ainda precisam ser confirmados. |
-| Motivo de correção | MVP apenas no fluxo excepcional | Não aparece no formulário normal; é solicitado somente quando a política exigir correção ou cancelamento. |
-| Detalhes adicionais | Não justificado sem requisito confirmado | A expressão é ampla e não define uma necessidade verificável. |
+| Local da atividade | Opcional no MVP | Pode apoiar consulta, mas não bloqueia saída ou conclusão. |
+| Ordem de serviço | Opcional | Fica em divulgação progressiva. |
+| Técnico | Opcional | Não representa autoria autenticada. |
+| Observações | Opcional | Não gera alerta quando ausente. |
+| Horários de saída e retorno | Automáticos | `startedAt` e `completedAt` não são digitados no fluxo normal. |
+| Motivo de correção ou cancelamento | Excepcional | Só aparece quando a política futura exigir. |
+| Detalhes adicionais | Não justificado | Não define necessidade verificável. |
 
-Um campo verdadeiramente opcional vazio não gera alerta por padrão. Qualquer mudança nessa regra exige evidência operacional e deve ser registrada em [Perguntas abertas](open-questions.md).
+## Ciclo mínimo do cilindro
 
-## Fora do Milestone 2A
+- `ACTIVE`: pode participar de nova atividade somente se possuir peso inicial e nenhuma atividade sem retorno.
+- `EMPTY`: preserva histórico, peso bruto final e instante da marcação; não aparece nas seleções ativas nem inicia novas atividades.
 
-O marco não cria classes, telas, navegação, APIs, persistência, segurança, backup ou exportação. O limite entre a documentação atual e a futura implementação Java está registrado no [ADR de abordagem da modelagem](../architecture/adr-001-domain-modeling-approach.md).
+Não existe limite automático de peso vazio. A marcação é manual, e o software não modela o descarte físico.
+
+## Requisito de migração futura
+
+Na planilha antiga, uma linha com saída e sem retorno pode ser uma atividade sem pesagem de retorno ou o peso inicial de um cilindro recém-recebido. A importação deve exigir classificação humana explícita e manter `initialGrossWeight` separado de `UsageActivity`.
+
+## Fora do Milestone 2A.1
+
+O marco não cria classes, enums, telas, APIs, persistência, segurança, importador, backup ou exportação. A separação da futura implementação Java permanece registrada no [ADR de abordagem da modelagem](../architecture/adr-001-domain-modeling-approach.md).
