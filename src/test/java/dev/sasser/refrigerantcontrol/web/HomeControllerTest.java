@@ -29,6 +29,7 @@ class HomeControllerTest {
 				.andExpect(content().string(containsString("Controle de Gases Refrigerantes")))
 				.andExpect(content().string(containsString("Esta página confirma a verificação inicial do ambiente de desenvolvimento.")))
 				.andExpect(content().string(containsString("A aplicação está em execução.")))
+				.andExpect(content().string(containsString("href=\"/cylinders\"")))
 				.andExpect(content().string(containsString("href=\"/status\"")));
 	}
 }
