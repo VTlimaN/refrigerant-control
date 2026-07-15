@@ -6,7 +6,7 @@ Esta é a fonte canônica para classificar erros bloqueantes, alertas confirmáv
 |---|---|---|---|---|---|---|---|---|---|
 | VAL-B-01 | Peso negativo | Erro bloqueante | qualquer peso bruto informado é menor que zero | peso informado e operação | Não | “O peso não pode ser negativo.” | tentativa rejeitada, se necessário | Confirmada | [OQ-WGT-01](open-questions.md#oq-wgt-01) e [OQ-WGT-02](open-questions.md#oq-wgt-02) |
 | VAL-B-02 | Retorno maior que saída | Erro bloqueante | `returnGrossWeight` maior que `departureGrossWeight` | ambos os pesos | Não | “O peso de retorno não pode ser maior que o peso de saída.” | valores rejeitados, se necessário | Confirmada | — |
-| VAL-B-03 | Informação essencial ausente | Erro bloqueante | falta dado exigido pela operação: lacre ou gás no cadastro; peso inicial antes do primeiro uso; cilindro ou saída no início; retorno na conclusão; peso final na marcação como vazio | caso de uso, campos e estado pretendido | Não | “Preencha as informações obrigatórias para continuar.” | campos rejeitados, sem criar estado inválido | Confirmada | [OQ-WGT-05](open-questions.md#oq-wgt-05) e [OQ-OPT-01](open-questions.md#oq-opt-01) |
+| VAL-B-03 | Informação essencial ausente | Erro bloqueante | falta dado exigido pela operação: lacre ou gás no cadastro; peso inicial antes do primeiro uso; cilindro ou saída no início; o local da atividade é obrigatório, valores nulos, vazios ou compostos apenas por espaços são inválidos e todo valor não branco é preservado exatamente; retorno na conclusão; peso final na marcação como vazio | caso de uso, campos e estado pretendido | Não | “Preencha as informações obrigatórias para continuar.” | campos rejeitados, sem criar estado inválido | Confirmada | [OQ-WGT-05](open-questions.md#oq-wgt-05), [OQ-ACT-03](open-questions.md#oq-act-03) e [OQ-OPT-01](open-questions.md#oq-opt-01) |
 | VAL-B-04 | Cilindro inexistente | Erro bloqueante | `sealNumber` não corresponde a cilindro cadastrado | lacre | Não | “O cilindro informado não existe.” | lacre rejeitado, quando necessário | Confirmada | [OQ-CYL-01](open-questions.md#oq-cyl-01) |
 | VAL-B-05 | Atividade anterior sem pesagem de retorno | Erro bloqueante | cilindro já possui atividade sem `returnGrossWeight` | cilindro e atividades pendentes | Não | “Este cilindro já possui uma atividade aguardando pesagem de retorno.” | atividade conflitante | Confirmada | [OQ-ACT-01](open-questions.md#oq-act-01) |
 | VAL-B-06 | Transição inválida | Erro bloqueante | mudança não permitida pelo ciclo de vida | estado atual, operação e campos | Não | “Esta alteração não é permitida para o estado atual.” | estado e operação rejeitada | Confirmada; políticas excepcionais abertas | [OQ-COR-01](open-questions.md#oq-cor-01) e [OQ-COR-02](open-questions.md#oq-cor-02) |
@@ -30,7 +30,7 @@ Esta é a fonte canônica para classificar erros bloqueantes, alertas confirmáv
 |---|---|---|
 | `VAL-W-04` | Data passada não é informada no fluxo normal. | `VAL-P-01` cobre somente operações excepcionais. |
 | `VAL-W-07` | Refrigerante do cilindro é imutável. | A tentativa é bloqueada por `VAL-B-10`. |
-| `VAL-P-02` | Campo opcional ausente não é validação. | Nenhum alerta por ausência. |
+| `VAL-P-02` | Campo opcional ausente não é validação. | Nenhum alerta por ausência de ordem de serviço, técnico ou observações; o local da atividade é obrigatório por `VAL-B-03`. |
 
 ## Aplicação da matriz
 

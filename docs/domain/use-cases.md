@@ -38,13 +38,13 @@ Os treze casos de uso descrevem objetivos operacionais sem definir telas, rotas,
 ## UC-04 — Registrar saída aguardando pesagem de retorno
 
 - **Objetivo:** iniciar o fluxo normal antes de existir peso bruto de retorno.
-- **Informação mínima:** cilindro ou lacre e `departureGrossWeight`.
+- **Informação mínima:** cilindro ou lacre, `departureGrossWeight` e `activityLocation` não vazio.
 - **Precondições:** cilindro existente em `ACTIVE`, `initialGrossWeight` válido antes do primeiro uso e nenhuma atividade do cilindro sem peso de retorno.
-- **Fluxo principal:** selecionar o cilindro; sugerir `lastKnownGrossWeight` somente quando existir valor válido com origem cronológica aprovada em [OQ-WGT-05](open-questions.md#oq-wgt-05) e [OQ-WGT-06](open-questions.md#oq-wgt-06); permitir a informação do peso bruto; registrar `startedAt` automaticamente e iniciar a atividade.
+- **Fluxo principal:** selecionar o cilindro; informar o local preservado exatamente; sugerir `lastKnownGrossWeight` somente quando existir valor válido com origem cronológica aprovada em [OQ-WGT-05](open-questions.md#oq-wgt-05) e [OQ-WGT-06](open-questions.md#oq-wgt-06); permitir a informação do peso bruto; registrar `startedAt` automaticamente e iniciar a atividade.
 - **Fluxo alternativo:** informar diretamente o peso quando não houver sugestão válida ou confirmar uma diferença legítima quando a tolerância futura assim exigir.
 - **Falhas bloqueantes:** peso negativo (`VAL-B-01`), informação essencial ausente (`VAL-B-03`), cilindro inexistente (`VAL-B-04`), atividade anterior sem retorno (`VAL-B-05`) ou cilindro vazio (`VAL-B-11`).
 - **Alertas confirmáveis:** diferença do último peso (`VAL-W-02`) e possível duplicidade (`VAL-W-05`) quando seus critérios forem aprovados.
-- **Resultado:** uma `UsageActivity` em `AWAITING_RETURN_WEIGHT`, sem retorno, `completedAt` ou consumo.
+- **Resultado:** uma `UsageActivity` com local obrigatório em `AWAITING_RETURN_WEIGHT`, sem retorno, `completedAt` ou consumo.
 
 ## UC-05 — Registrar pesagem de retorno
 

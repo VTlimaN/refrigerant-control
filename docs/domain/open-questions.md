@@ -4,7 +4,7 @@ Este documento registra decisões respondidas e perguntas que ainda exigem evid�
 
 A planilha original não estava disponível nesta sessão e não foi inspecionada pelo Codex. As respostas deste marco usam confirmação do responsável operacional e resumo de análise externa da planilha. O arquivo ainda será necessário para migração e para assuntos que permanecem abertos.
 
-Existem 37 IDs: 18 com status `Respondida` e 19 com status `Aberta`.
+Existem 37 IDs: 19 com status `Respondida` e 18 com status `Aberta`.
 
 ## Pesos
 
@@ -38,7 +38,7 @@ Existem 37 IDs: 18 com status `Respondida` e 19 com status `Aberta`.
 |---|---|---|---|---|---|---|---|---|---|
 | <a id="oq-act-01"></a>OQ-ACT-01 | Atividade | Um cilindro pode ter mais de uma atividade sem peso de retorno? | Respondida | Não permitir nova atividade até registrar o retorno da anterior. | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | responsável operacional | disponibilidade e `VAL-B-05` | Não | Sem pesagem intermediária, o consumo não pode ser atribuído corretamente. |
 | <a id="oq-act-02"></a>OQ-ACT-02 | Atividade | Quais campos mínimos identificam uma atividade no histórico? | Aberta | Usar identidade própria interna sem expor campo adicional no formulário. | consultas atuais e planilha | operação e revisão técnica | identidade de `UsageActivity` | Sim para implementação completa | — |
-| <a id="oq-act-03"></a>OQ-ACT-03 | Local | O local opcional é texto livre ou possui padrão estável? | Aberta | Manter atributo opcional simples; sugestões não criam entidade. | valores reais e necessidade de pesquisa | responsável operacional | consulta e sugestões | Não para o núcleo | — |
+| <a id="oq-act-03"></a>OQ-ACT-03 | Local | O local da atividade é obrigatório e qual formato utiliza? | Respondida | Usar texto livre obrigatório, sem normalização nem entidade própria. | decisão operacional para o Milestone 2C.3A | responsável operacional | início, consulta e histórico | Não | Rejeitar valor nulo, vazio ou somente espaços e preservar exatamente todo valor não vazio. |
 | <a id="oq-act-04"></a>OQ-ACT-04 | Atividade | Criar diretamente em `COMPLETED` pertence ao fluxo normal? | Respondida | Não. Restringir a importação, correção histórica ou recuperação controlada futura. | confirmação operacional na revisão e contexto do resumo da análise externa; planilha indisponível nesta sessão | responsável do produto | UC-03 e política temporal | Não para o fluxo normal; exceção depende de OQ-DAT-05, OQ-DAT-06 e OQ-COR-01 | Não inventar instantes históricos. |
 
 <a id="datas-e-tempo"></a>
@@ -67,7 +67,7 @@ Existem 37 IDs: 18 com status `Respondida` e 19 com status `Aberta`.
 
 | ID | Área | Pergunta | Status | Recomendação atual | Evidência necessária | Responsável esperado | Impacto | Bloqueia o Milestone 2B? | Decisão final |
 |---|---|---|---|---|---|---|---|---|---|
-| <a id="oq-opt-01"></a>OQ-OPT-01 | Campos opcionais | Quais informações ficam fora do fluxo obrigatório? | Respondida | Local, ordem de serviço, técnico e observações são opcionais; horários normais são automáticos; ausência não alerta. | confirmação operacional e resumo da análise externa; planilha indisponível nesta sessão | responsável operacional | escopo e simplicidade | Não | Usar divulgação progressiva. |
+| <a id="oq-opt-01"></a>OQ-OPT-01 | Campos opcionais | Quais informações ficam fora do fluxo obrigatório? | Respondida | Ordem de serviço, técnico e observações são opcionais; horários normais são automáticos; ausência não alerta. O local foi confirmado como obrigatório em OQ-ACT-03. | confirmação operacional, resumo da análise externa e decisão do Milestone 2C.3A; planilha indisponível nesta sessão | responsável operacional | escopo e simplicidade | Não | Usar divulgação progressiva somente para ordem de serviço, técnico e observações. |
 | <a id="oq-adm-01"></a>OQ-ADM-01 | Backup | Qual formato, destino, frequência e verificação são necessários para backup? | Aberta | Não escolher infraestrutura antes do requisito. | rotina atual e necessidade de restauração | responsável do produto | caso de uso de backup | Não para domínio puro; sim para futuro backup | — |
 | <a id="oq-adm-02"></a>OQ-ADM-02 | Exportação | Qual formato, conteúdo e finalidade são necessários para exportação? | Aberta | Definir pelo consumidor real dos dados. | exemplos de uso e arquivos esperados | responsável do produto | caso de uso de exportação | Não para domínio puro; sim para futura exportação | — |
 | <a id="oq-aud-01"></a>OQ-AUD-01 | Autoria | Como registrar autoria enquanto não existe autenticação? | Aberta | Documentar a limitação e não criar segurança neste marco. | necessidade real de atribuição | responsável do produto | rastreabilidade | Não para núcleo do 2B | — |
@@ -81,7 +81,7 @@ Antes das partes afetadas do Milestone 2B ou de funcionalidades posteriores, con
 - valores incompatíveis com `0,01 kg`, capacidade da balança e tolerâncias;
 - transferência, manutenção, recalibração e correção manual de peso;
 - consumo alto e duplicidade;
-- identidade interna da atividade e formato do local opcional;
+- identidade interna da atividade;
 - políticas de correção, cancelamento, exclusão e autoria;
 - tratamento temporal de importações e correções históricas;
 - marcação como vazio com atividade sem retorno;

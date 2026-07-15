@@ -60,6 +60,14 @@ Depois de um cadastro bem-sucedido, o controller usa POST/Redirect/GET e prepara
 
 Este fluxo não inclui início ou retorno de atividades, histórico, lista de cilindros, banco de dados, autenticação nem uma interface operacional completa. A atomicidade continua restrita às chamadas que compartilham a mesma instância do adaptador em memória na mesma JVM.
 
+## Milestone 2C.3A — Contrato obrigatório do local da atividade
+
+O início de uma `UsageActivity` agora exige `activityLocation` como texto livre não vazio. Valores nulos, vazios ou formados somente por espaços são rejeitados pelo domínio. Todo valor não vazio é preservado exatamente, inclusive espaços externos, capitalização, acentos e pontuação; não existe normalização, limite arbitrário, endereço estruturado nem objeto de valor adicional.
+
+`UsageActivityUseCases` diferencia a ausência do peso bruto inicial de uma atividade pendente por exceções específicas da aplicação. A detecção da atividade pendente ocorre dentro da operação atômica do `UsageActivityStore`, enquanto `UsageActivityStarter` continua protegendo a mesma regra no domínio. Os snapshots em memória preservam o local em atividades pendentes e concluídas, sem introduzir persistência durável ou garantia entre processos.
+
+Esta etapa altera somente o contrato interno de domínio e aplicação. Ainda não existe controller, formulário, template ou rota HTTP para iniciar atividades.
+
 ## Tecnologias
 
 ### Java 25
@@ -300,3 +308,5 @@ O Milestone 2B.2 demonstra como casos de uso coordenam o domínio, como portas e
 O Milestone 2C.1 apresenta a raiz de composição, onde as dependências concretas são conectadas. A inversão de dependência mantém os casos de uso ligados às portas, a injeção por construtor entrega essas dependências sem setters, o escopo singleton preserva uma instância por contexto e o `Clock` injetado separa a obtenção do tempo das regras da aplicação.
 
 O Milestone 2C.2 demonstra como formulários de apresentação, Bean Validation, parsing explícito para `BigDecimal`, mensagens de erro e POST/Redirect/GET formam uma fronteira web simples. O controller coordena HTTP e delega as regras aos casos de uso, enquanto o Thymeleaf mantém a saída escapada e uma folha de estilos compartilhada oferece uma interface responsiva sem JavaScript.
+
+O Milestone 2C.3A demonstra como uma informação obrigatória atravessa agregado, caso de uso, resultado e snapshot sem perder seu valor original. Exceções específicas tornam falhas operacionais distinguíveis, e a verificação da atividade pendente permanece dentro da fronteira atômica do adapter em memória.

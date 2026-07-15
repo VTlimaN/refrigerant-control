@@ -24,7 +24,7 @@ Um cilindro não é recarregável e sua associação com `RefrigerantGas` é imu
 
 É candidato a entidade porque representa um fato operacional identificável, muda de estado e precisa preservar sua história em correções e cancelamentos.
 
-No fluxo normal, uma `UsageActivity` começa em `AWAITING_RETURN_WEIGHT` e passa a `COMPLETED` quando a pesagem de retorno é registrada. Não serão criados conceitos separados `OpenActivity` e `CompletedActivity`.
+No fluxo normal, uma `UsageActivity` exige `activityLocation` como texto livre não vazio, começa em `AWAITING_RETURN_WEIGHT` e passa a `COMPLETED` quando a pesagem de retorno é registrada. O local permanece inalterado durante essa transição. Não serão criados conceitos separados `OpenActivity` e `CompletedActivity`.
 
 A criação direta em `COMPLETED` fica restrita a importação, correção histórica ou recuperação controlada futura. Ela não autoriza inventar `startedAt` para um fato passado.
 
@@ -61,7 +61,8 @@ Não se adiciona estado de descarte físico. A operação real descarta o recipi
 
 ## Atributos simples no MVP
 
-- Local, ordem de serviço, técnico e observações são atributos opcionais e não justificam entidades.
+- `activityLocation` é um atributo textual obrigatório de `UsageActivity`; valores não vazios são preservados exatamente e não justificam entidade ou objeto de valor próprio.
+- Ordem de serviço, técnico e observações são atributos opcionais e não justificam entidades.
 - `nominalNetContent` é atributo candidato do cilindro, diferente de peso bruto e sem obrigatoriedade confirmada.
 - A data civil normal é derivada de `startedAt`, não um atributo editável duplicado.
 - Um alerta é resultado de uma avaliação, não uma entidade por padrão.
@@ -73,7 +74,7 @@ Um agregado reúne conceitos do domínio que precisam preservar consistência em
 
 ### Atividade de uso
 
-`UsageActivity` é raiz candidata para proteger pesos brutos, instantes, atributos opcionais, estado e transições. Consumo pertence ao seu comportamento derivado.
+`UsageActivity` é raiz candidata para proteger pesos brutos, local obrigatório, instantes, atributos opcionais, estado e transições. Consumo pertence ao seu comportamento derivado.
 
 ### Cilindro
 

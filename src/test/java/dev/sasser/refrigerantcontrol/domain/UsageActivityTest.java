@@ -5,6 +5,9 @@ import java.time.Instant;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -14,12 +17,14 @@ class UsageActivityTest {
 
 	private static final Instant STARTED_AT = Instant.parse("2026-07-14T12:00:00Z");
 	private static final Instant COMPLETED_AT = Instant.parse("2026-07-14T13:00:00Z");
+	private static final String ACTIVITY_LOCATION = "Technical room — Área A";
 
 	@Test
 	void shouldStartAwaitingReturnWeight() {
 		UsageActivity activity = startActivity(Weight.of(new BigDecimal("15.14")));
 
 		assertEquals(ActivityStatus.AWAITING_RETURN_WEIGHT, activity.status());
+		assertEquals(ACTIVITY_LOCATION, activity.activityLocation());
 		assertEquals(STARTED_AT, activity.startedAt());
 		assertPending(activity);
 	}
@@ -97,12 +102,51 @@ class UsageActivityTest {
 		assertEquals(firstReturnWeight, activity.returnGrossWeight().orElseThrow());
 		assertEquals(COMPLETED_AT, activity.completedAt().orElseThrow());
 		assertEquals(firstConsumption, activity.consumedQuantity().orElseThrow());
+		assertEquals(ACTIVITY_LOCATION, activity.activityLocation());
+	}
+
+	@Test
+	void shouldPreserveNonblankLocationExactly() {
+		String location = "  Oficina técnica — Área 1  ";
+
+		UsageActivity activity = startActivity(Weight.of(new BigDecimal("15.14")), location);
+
+		assertEquals(location, activity.activityLocation());
+	}
+
+	@ParameterizedTest
+	@NullAndEmptySource
+	@ValueSource(strings = "   ")
+	void shouldRejectBlankLocation(String location) {
+		Cylinder cylinder = readyCylinder();
+
+		assertThrows(
+				IllegalArgumentException.class,
+				() -> UsageActivity.start(
+						cylinder,
+						Weight.of(new BigDecimal("15.14")),
+						location,
+						STARTED_AT));
 	}
 
 	private static UsageActivity startActivity(Weight departureGrossWeight) {
+		return startActivity(departureGrossWeight, ACTIVITY_LOCATION);
+	}
+
+	private static UsageActivity startActivity(Weight departureGrossWeight, String activityLocation) {
+		Cylinder cylinder = readyCylinder();
+		return new UsageActivityStarter().start(
+				cylinder,
+				departureGrossWeight,
+				activityLocation,
+				STARTED_AT,
+				List.of());
+	}
+
+	private static Cylinder readyCylinder() {
 		Cylinder cylinder = Cylinder.register(SealNumber.of("LACRE-001"), RefrigerantGas.of("R410A"));
 		cylinder.registerInitialGrossWeight(Weight.of(new BigDecimal("16.00")));
-		return new UsageActivityStarter().start(cylinder, departureGrossWeight, STARTED_AT, List.of());
+		return cylinder;
 	}
 
 	private static void assertPending(UsageActivity activity) {

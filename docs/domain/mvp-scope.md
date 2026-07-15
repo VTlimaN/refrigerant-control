@@ -11,9 +11,10 @@ Este documento classifica capacidades do produto. O Milestone 2A.1 registra deci
 Informações visíveis obrigatórias:
 
 1. cilindro ou número do lacre;
-2. peso bruto de saída.
+2. peso bruto de saída;
+3. local da atividade.
 
-O sistema registra `startedAt` automaticamente. O refrigerante vem da associação imutável do cilindro. Local, ordem de serviço, técnico e observações podem aparecer em “Mais informações”, sem alerta quando ausentes.
+O sistema registra `startedAt` automaticamente. O refrigerante vem da associação imutável do cilindro. O local é texto livre obrigatório e preservado exatamente. Ordem de serviço, técnico e observações podem aparecer em “Mais informações”, sem alerta quando ausentes.
 
 ### Registrar pesagem de retorno
 
@@ -47,7 +48,8 @@ Os [treze casos de uso](use-cases.md) descrevem essas capacidades sem antecipar 
 - `returnGrossWeight`, quando registrado;
 - `startedAt` e `completedAt`;
 - `ActivityStatus`;
-- local, ordem de serviço, técnico e observações opcionais;
+- `activityLocation` obrigatório;
+- ordem de serviço, técnico e observações opcionais;
 - confirmações e rastreabilidade quando aplicáveis.
 
 ### Dados do cilindro
@@ -74,11 +76,11 @@ Os dados técnicos ficam fora do fluxo operacional.
 
 Backup, exportação, futura importação, usuários e configurações pertencem a uma área secundária. Backup e exportação fazem parte do MVP, mas seus formatos permanecem abertos. Autenticação, autorização e código de importação não pertencem a este marco.
 
-## Informações opcionais
+## Informações adicionais
 
 | Informação | Classificação | Regra |
 |---|---|---|
-| Local da atividade | Opcional no MVP | Pode apoiar consulta, mas não bloqueia saída ou conclusão. |
+| Local da atividade | Obrigatório | Texto livre não vazio, preservado exatamente e exigido no início da atividade. |
 | Ordem de serviço | Opcional | Fica em divulgação progressiva. |
 | Técnico | Opcional | Não representa autoria autenticada. |
 | Observações | Opcional | Não gera alerta quando ausente. |

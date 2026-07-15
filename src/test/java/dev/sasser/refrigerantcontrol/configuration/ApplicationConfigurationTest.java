@@ -80,7 +80,8 @@ class ApplicationConfigurationTest {
 				new BigDecimal("15.140"));
 		UsageActivityResult activity = usageActivityUseCases.startUsageActivity(
 				"SPRING-COMPOSITION-001",
-				new BigDecimal("15.140"));
+				new BigDecimal("15.140"),
+				"Spring composition test location");
 
 		assertEquals("SPRING-COMPOSITION-001", activity.sealNumber());
 		assertEquals(ActivityStatus.AWAITING_RETURN_WEIGHT, activity.status());

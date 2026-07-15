@@ -102,6 +102,7 @@ public final class InMemoryUsageActivityStore implements UsageActivityStore {
 			String operationalRefrigerantName,
 			BigDecimal initialGrossWeight,
 			BigDecimal departureGrossWeight,
+			String activityLocation,
 			Instant startedAt,
 			ActivityStatus status,
 			Optional<BigDecimal> returnGrossWeight,
@@ -114,6 +115,9 @@ public final class InMemoryUsageActivityStore implements UsageActivityStore {
 					"operational refrigerant name must not be null");
 			Objects.requireNonNull(initialGrossWeight, "initial gross weight must not be null");
 			Objects.requireNonNull(departureGrossWeight, "departure gross weight must not be null");
+			if (activityLocation == null || activityLocation.isBlank()) {
+				throw new IllegalArgumentException("activity location must not be blank");
+			}
 			Objects.requireNonNull(startedAt, "started at must not be null");
 			Objects.requireNonNull(status, "status must not be null");
 			Objects.requireNonNull(returnGrossWeight, "return gross weight must not be null");
@@ -136,6 +140,7 @@ public final class InMemoryUsageActivityStore implements UsageActivityStore {
 					activity.cylinder().refrigerantGas().operationalName(),
 					initialGrossWeight.inKilograms(),
 					activity.departureGrossWeight().inKilograms(),
+					activity.activityLocation(),
 					activity.startedAt(),
 					activity.status(),
 					activity.returnGrossWeight().map(Weight::inKilograms),
@@ -150,6 +155,7 @@ public final class InMemoryUsageActivityStore implements UsageActivityStore {
 			UsageActivity activity = new UsageActivityStarter().start(
 					cylinder,
 					Weight.of(departureGrossWeight),
+					activityLocation,
 					startedAt,
 					List.of());
 			if (status == ActivityStatus.COMPLETED) {

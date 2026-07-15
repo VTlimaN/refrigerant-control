@@ -6,18 +6,18 @@ Uma `UsageActivity` representa o fluxo completo iniciado na saída. O registro d
 
 | Estado | Campos obrigatórios | Campos ausentes ou indisponíveis | Valor derivado |
 |---|---|---|---|
-| `AWAITING_RETURN_WEIGHT` | cilindro, `departureGrossWeight`, `startedAt` | `returnGrossWeight` e `completedAt` ausentes; `consumedQuantity` indisponível | nenhum consumo |
-| `COMPLETED` | cilindro, `departureGrossWeight`, `returnGrossWeight` e evidência temporal coerente com a origem; no fluxo normal, `startedAt` e `completedAt` | nenhum peso operacional ausente | `consumedQuantity = departureGrossWeight - returnGrossWeight` |
+| `AWAITING_RETURN_WEIGHT` | cilindro, `departureGrossWeight`, `activityLocation` e `startedAt` | `returnGrossWeight` e `completedAt` ausentes; `consumedQuantity` indisponível | nenhum consumo |
+| `COMPLETED` | cilindro, `departureGrossWeight`, `activityLocation`, `returnGrossWeight` e evidência temporal coerente com a origem; no fluxo normal, `startedAt` e `completedAt` | nenhum peso operacional ausente | `consumedQuantity = departureGrossWeight - returnGrossWeight` |
 | `CANCELLED` | dados anteriores e motivo, se o estado for aprovado | excluído dos cálculos normais | nenhum novo consumo válido |
 
-Local, ordem de serviço, técnico e observações são opcionais em qualquer estado. Combinações contrárias à tabela são erros bloqueantes. `CANCELLED` continua candidato e pode ser substituído por invalidação auditável.
+O local da atividade é obrigatório e permanece inalterado durante todo o ciclo. Ordem de serviço, técnico e observações continuam opcionais em qualquer estado. Combinações contrárias à tabela são erros bloqueantes. `CANCELLED` continua candidato e pode ser substituído por invalidação auditável.
 
 ## Fluxo operacional normal
 
 ### Registrar saída
 
 - **Origem:** atividade inexistente.
-- **Precondições:** cilindro existente em `ACTIVE`, peso inicial válido antes do primeiro uso, nenhuma atividade do mesmo cilindro sem retorno e peso bruto de saída válido.
+- **Precondições:** cilindro existente em `ACTIVE`, peso inicial válido antes do primeiro uso, nenhuma atividade do mesmo cilindro sem retorno, peso bruto de saída válido e local da atividade não vazio.
 - **Efeito automático:** produzir `startedAt`.
 - **Resultado:** `AWAITING_RETURN_WEIGHT`.
 - **Valor derivado:** consumo indisponível.
@@ -53,6 +53,7 @@ A restrição ao fluxo excepcional está respondida em [OQ-ACT-04](open-question
 ## Transições inválidas
 
 - iniciar nova atividade para o mesmo cilindro enquanto outra não possui `returnGrossWeight`;
+- iniciar atividade sem `activityLocation` não vazio;
 - concluir sem `returnGrossWeight`;
 - manter retorno, `completedAt` ou consumo em `AWAITING_RETURN_WEIGHT`;
 - concluir quando o retorno supera a saída;
