@@ -28,9 +28,19 @@ O Milestone 2B.1 adiciona um primeiro recorte do domínio como Java puro, sem de
 - `UsageActivity` e `ActivityStatus`, com a transição determinística de `AWAITING_RETURN_WEIGHT` para `COMPLETED`;
 - `UsageActivityStarter`, que bloqueia uma segunda atividade pendente quando recebe a coleção completa de atividades relevantes.
 
-Os instantes são fornecidos explicitamente às operações do domínio. A futura camada de aplicação será responsável por obtê-los automaticamente; o domínio não consulta o relógio do sistema. Os novos testes usam JUnit diretamente, sem iniciar o contexto Spring.
+Os instantes são fornecidos explicitamente às operações do domínio, que não consulta o relógio do sistema. Os testes do domínio usam JUnit diretamente, sem iniciar o contexto Spring.
 
 Esta etapa não implementa persistência, transações, unicidade global de lacres, interface operacional, catálogo técnico editável, cilindros `EMPTY` nem o restante do Milestone 2B. Essas capacidades continuam adiadas conforme as perguntas abertas na documentação do domínio.
+
+## Milestone 2B.2 — Casos de uso do fluxo normal
+
+O Milestone 2B.2 adiciona uma camada de aplicação também escrita em Java puro. `CylinderUseCases` coordena o cadastro de cilindros e o registro separado do peso bruto inicial. `UsageActivityUseCases` coordena o início e a conclusão da atividade pendente, reutilizando as regras existentes no domínio.
+
+As entradas da aplicação usam `String` e `BigDecimal`. As saídas são registros imutáveis, `CylinderResult` e `UsageActivityResult`, que não expõem as entidades mutáveis do domínio. Os instantes de início e conclusão são obtidos de um `Clock` fornecido ao caso de uso e continuam sendo passados explicitamente ao domínio.
+
+As interfaces `CylinderStore` e `UsageActivityStore` definem operações específicas para cadastro único, atualização do cilindro, início atômico e conclusão da atividade pendente. Os adaptadores `InMemoryCylinderStore` e `InMemoryUsageActivityStore` permitem executar e testar essas operações sem Spring e sem banco de dados. Eles guardam snapshots imutáveis, devolvem reconstruções independentes e preservam o histórico de atividades concluídas usado na validação de um novo início.
+
+Esses adaptadores são temporários, não duráveis e locais ao processo. A atomicidade e a unicidade valem somente para chamadas que compartilham a mesma instância do adaptador na mesma JVM. Não há garantia distribuída, transação de banco de dados, configuração automática de componentes Spring nem integração com as rotas existentes.
 
 ## Tecnologias
 
@@ -84,6 +94,9 @@ Arquivos importantes:
 - `mvnw`: Maven Wrapper para Debian e outros sistemas compatíveis com POSIX.
 - `RefrigerantControlApplication.java`: ponto de entrada da aplicação.
 - `dev.sasser.refrigerantcontrol.domain`: fundamentos do domínio implementados em Java puro.
+- `dev.sasser.refrigerantcontrol.application`: casos de uso e resultados imutáveis do fluxo normal.
+- `dev.sasser.refrigerantcontrol.application.port`: contratos específicos de armazenamento usados pelos casos de uso.
+- `dev.sasser.refrigerantcontrol.infrastructure.memory`: adaptadores em memória, não duráveis e independentes de Spring.
 - `application.properties`: nome visível da aplicação.
 - `home.html`: página inicial renderizada pelo Thymeleaf.
 - `AGENTS.md`: regras permanentes para futuras sessões do Codex.
@@ -235,13 +248,14 @@ No estado atual do projeto ainda não existem:
 
 - banco de dados;
 - autenticação ou usuários;
-- persistência ou garantia transacional das regras do domínio;
-- garantia de unicidade global dos lacres fora de uma futura fronteira de aplicação;
+- persistência durável ou garantia transacional de banco de dados;
+- garantia de unicidade global dos lacres entre processos ou instâncias diferentes dos adaptadores em memória;
 - dashboard;
 - controllers, formulários ou telas para operar gases, cilindros e atividades;
-- geração automática de instantes por uma camada de aplicação;
+- configuração Spring ou acesso HTTP para os novos casos de uso;
+- conversão de datas para apresentação em `America/Sao_Paulo`;
 - ciclo de cilindro vazio, correção, cancelamento ou importação;
-- histórico persistido, relatórios, backup ou exportação;
+- identificação persistente de atividades, relatórios, backup ou exportação;
 - implementação completa do Milestone 2B.
 
 ## O que este marco ensina
@@ -249,3 +263,5 @@ No estado atual do projeto ainda não existem:
 Ao concluir o primeiro marco, o desenvolvedor entende como Java, Maven, Spring Boot, Spring MVC, Thymeleaf e Tomcat trabalham juntos; como testes verificam o contexto, a página e o JSON; como produzir e executar um JAR; e como manter o mesmo projeto compatível com Windows e Debian.
 
 O Milestone 2B.1 acrescenta o aprendizado sobre objetos de valor, identidade de entidades, imutabilidade, `Optional`, igualdade de `BigDecimal`, transições de estado e testes unitários determinísticos sem Spring.
+
+O Milestone 2B.2 demonstra como casos de uso coordenam o domínio, como portas evitam acoplamento a uma tecnologia de persistência, como um `Clock` torna o tempo determinístico e como snapshots impedem que referências mutáveis alterem acidentalmente o estado armazenado.
