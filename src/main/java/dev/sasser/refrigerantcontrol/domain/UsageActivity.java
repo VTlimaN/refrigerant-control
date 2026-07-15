@@ -8,22 +8,35 @@ public final class UsageActivity {
 
 	private final Cylinder cylinder;
 	private final Weight departureGrossWeight;
+	private final String activityLocation;
 	private final Instant startedAt;
 	private ActivityStatus status;
 	private Weight returnGrossWeight;
 	private Instant completedAt;
 
-	private UsageActivity(Cylinder cylinder, Weight departureGrossWeight, Instant startedAt) {
+	private UsageActivity(
+			Cylinder cylinder,
+			Weight departureGrossWeight,
+			String activityLocation,
+			Instant startedAt) {
 		this.cylinder = Objects.requireNonNull(cylinder, "cylinder must not be null");
 		this.departureGrossWeight = Objects.requireNonNull(
 				departureGrossWeight,
 				"departure gross weight must not be null");
+		if (activityLocation == null || activityLocation.isBlank()) {
+			throw new IllegalArgumentException("activity location must not be blank");
+		}
+		this.activityLocation = activityLocation;
 		this.startedAt = Objects.requireNonNull(startedAt, "started at must not be null");
 		this.status = ActivityStatus.AWAITING_RETURN_WEIGHT;
 	}
 
-	static UsageActivity start(Cylinder cylinder, Weight departureGrossWeight, Instant startedAt) {
-		return new UsageActivity(cylinder, departureGrossWeight, startedAt);
+	static UsageActivity start(
+			Cylinder cylinder,
+			Weight departureGrossWeight,
+			String activityLocation,
+			Instant startedAt) {
+		return new UsageActivity(cylinder, departureGrossWeight, activityLocation, startedAt);
 	}
 
 	public Cylinder cylinder() {
@@ -32,6 +45,10 @@ public final class UsageActivity {
 
 	public Weight departureGrossWeight() {
 		return departureGrossWeight;
+	}
+
+	public String activityLocation() {
+		return activityLocation;
 	}
 
 	public Instant startedAt() {

@@ -38,6 +38,7 @@ class InMemoryUsageActivityStoreTest {
 	private static final Instant STARTED_AT = Instant.parse("2026-07-15T12:00:00Z");
 	private static final Instant COMPLETED_AT = Instant.parse("2026-07-15T13:00:00Z");
 	private static final Weight DEPARTURE_WEIGHT = Weight.of(new BigDecimal("15.14"));
+	private static final String ACTIVITY_LOCATION = "  Technical room — Área A  ";
 	private static final UsageActivityStarter STARTER = new UsageActivityStarter();
 
 	@Test
@@ -51,6 +52,7 @@ class InMemoryUsageActivityStoreTest {
 			UsageActivity activity = STARTER.start(
 					readyCylinder(FIRST_SEAL.value()),
 					DEPARTURE_WEIGHT,
+					ACTIVITY_LOCATION,
 					STARTED_AT,
 					activities);
 			callbackActivity.set(activity);
@@ -59,6 +61,7 @@ class InMemoryUsageActivityStoreTest {
 
 		assertEquals(1, calls.get());
 		assertNotSame(callbackActivity.get(), returned);
+		assertEquals(ACTIVITY_LOCATION, returned.activityLocation());
 		returned.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT);
 		AtomicReference<ActivityStatus> storedStatus = new AtomicReference<>();
 		store.completePendingAtomically(FIRST_SEAL, activity -> {
@@ -82,10 +85,12 @@ class InMemoryUsageActivityStoreTest {
 			UsageActivity completed = activities.iterator().next();
 			assertEquals(ActivityStatus.COMPLETED, completed.status());
 			assertEquals(FIRST_SEAL, completed.cylinder().sealNumber());
+			assertEquals(ACTIVITY_LOCATION, completed.activityLocation());
 			assertThrows(UnsupportedOperationException.class, () -> activities.add(completed));
 			return STARTER.start(
 					readyCylinder(FIRST_SEAL.value()),
 					Weight.of(new BigDecimal("12.10")),
+					"Second technical room",
 					COMPLETED_AT.plusSeconds(60),
 					activities);
 		});
@@ -149,6 +154,7 @@ class InMemoryUsageActivityStoreTest {
 			return STARTER.start(
 					readyCylinder(FIRST_SEAL.value()),
 					Weight.of(new BigDecimal("11.00")),
+					"Third technical room",
 					COMPLETED_AT.plusSeconds(180),
 					activities);
 		});
@@ -192,6 +198,7 @@ class InMemoryUsageActivityStoreTest {
 						activities -> STARTER.start(
 								readyCylinder(SECOND_SEAL.value()),
 								DEPARTURE_WEIGHT,
+								ACTIVITY_LOCATION,
 								STARTED_AT,
 								activities)));
 
@@ -241,6 +248,7 @@ class InMemoryUsageActivityStoreTest {
 
 		assertNotSame(callbackActivity.get(), returned);
 		assertEquals(ActivityStatus.COMPLETED, returned.status());
+		assertEquals(ACTIVITY_LOCATION, returned.activityLocation());
 		assertTrue(store.completePendingAtomically(FIRST_SEAL, activity -> {
 		}).isEmpty());
 		RuntimeException inspected = new RuntimeException("completed history inspected");
@@ -265,6 +273,7 @@ class InMemoryUsageActivityStoreTest {
 			return STARTER.start(
 					readyCylinder(SECOND_SEAL.value()),
 					DEPARTURE_WEIGHT,
+					ACTIVITY_LOCATION,
 					STARTED_AT,
 					activities);
 		});
@@ -310,6 +319,7 @@ class InMemoryUsageActivityStoreTest {
 										activities -> STARTER.start(
 												readyCylinder(FIRST_SEAL.value()),
 												DEPARTURE_WEIGHT,
+												ACTIVITY_LOCATION,
 												STARTED_AT.plusSeconds(index),
 												activities));
 								return true;
@@ -365,6 +375,7 @@ class InMemoryUsageActivityStoreTest {
 				activities -> STARTER.start(
 						readyCylinder(sealNumber.value()),
 						DEPARTURE_WEIGHT,
+						ACTIVITY_LOCATION,
 						startedAt,
 						activities));
 	}

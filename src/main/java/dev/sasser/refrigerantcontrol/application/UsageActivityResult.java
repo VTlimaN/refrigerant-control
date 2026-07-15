@@ -12,6 +12,7 @@ import dev.sasser.refrigerantcontrol.domain.Weight;
 public record UsageActivityResult(
 		String sealNumber,
 		BigDecimal departureGrossWeight,
+		String activityLocation,
 		Instant startedAt,
 		ActivityStatus status,
 		Optional<BigDecimal> returnGrossWeight,
@@ -21,6 +22,9 @@ public record UsageActivityResult(
 	public UsageActivityResult {
 		Objects.requireNonNull(sealNumber, "seal number must not be null");
 		Objects.requireNonNull(departureGrossWeight, "departure gross weight must not be null");
+		if (activityLocation == null || activityLocation.isBlank()) {
+			throw new IllegalArgumentException("Activity location must not be blank");
+		}
 		Objects.requireNonNull(startedAt, "started at must not be null");
 		Objects.requireNonNull(status, "status must not be null");
 		Objects.requireNonNull(returnGrossWeight, "return gross weight must not be null");
@@ -33,6 +37,7 @@ public record UsageActivityResult(
 		return new UsageActivityResult(
 				requiredActivity.cylinder().sealNumber().value(),
 				requiredActivity.departureGrossWeight().inKilograms(),
+				requiredActivity.activityLocation(),
 				requiredActivity.startedAt(),
 				requiredActivity.status(),
 				requiredActivity.returnGrossWeight().map(Weight::inKilograms),

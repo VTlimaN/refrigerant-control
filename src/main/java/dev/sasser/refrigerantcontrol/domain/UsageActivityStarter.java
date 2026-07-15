@@ -13,12 +13,16 @@ public final class UsageActivityStarter {
 	public UsageActivity start(
 			Cylinder cylinder,
 			Weight departureGrossWeight,
+			String activityLocation,
 			Instant startedAt,
 			Collection<UsageActivity> relevantActivities) {
 		Cylinder requiredCylinder = Objects.requireNonNull(cylinder, "cylinder must not be null");
 		Weight requiredDepartureWeight = Objects.requireNonNull(
 				departureGrossWeight,
 				"departure gross weight must not be null");
+		if (activityLocation == null || activityLocation.isBlank()) {
+			throw new IllegalArgumentException("activity location must not be blank");
+		}
 		Instant requiredStartedAt = Objects.requireNonNull(startedAt, "started at must not be null");
 		List<UsageActivity> activities = List.copyOf(
 				Objects.requireNonNull(relevantActivities, "relevant activities must not be null"));
@@ -35,6 +39,10 @@ public final class UsageActivityStarter {
 			throw new IllegalStateException("cylinder already has an activity awaiting return weight");
 		}
 
-		return UsageActivity.start(requiredCylinder, requiredDepartureWeight, requiredStartedAt);
+		return UsageActivity.start(
+				requiredCylinder,
+				requiredDepartureWeight,
+				activityLocation,
+				requiredStartedAt);
 	}
 }

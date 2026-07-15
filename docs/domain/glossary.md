@@ -44,7 +44,7 @@ As decisões confirmadas neste marco foram fornecidas por confirmação operacio
 | Instante de cancelamento | `cancelledAt` | Conceito confirmado; política aberta | Instante automático de eventual cancelamento ou invalidação. |
 | Instante da marcação como vazio | `markedEmptyAt` | Confirmado; representação candidata | Instante automático da ação manual que muda o cilindro para `EMPTY`. |
 | Data civil da atividade | — | Valor derivado | Data local derivada de `startedAt` usando `America/Sao_Paulo`; não é campo manual no fluxo normal. |
-| Local da atividade | `activityLocation` | Atributo opcional | Texto opcional, sem ciclo de vida independente confirmado. |
+| Local da atividade | `activityLocation` | Atributo obrigatório | Texto livre não vazio, preservado exatamente como informado e sem ciclo de vida independente. |
 
 ## Nomes operacionais confirmados
 

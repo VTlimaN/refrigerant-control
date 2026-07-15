@@ -31,19 +31,31 @@ public final class UsageActivityUseCases {
 		this.usageActivityStarter = new UsageActivityStarter();
 	}
 
-	public UsageActivityResult startUsageActivity(String sealNumber, BigDecimal departureGrossWeight) {
+	public UsageActivityResult startUsageActivity(
+			String sealNumber,
+			BigDecimal departureGrossWeight,
+			String activityLocation) {
 		SealNumber seal = SealNumber.of(sealNumber);
 		Weight departureWeight = Weight.of(departureGrossWeight);
 		Cylinder cylinder = cylinderStore.findBySealNumber(seal)
 				.orElseThrow(() -> new CylinderNotFoundException(seal));
+		if (cylinder.initialGrossWeight().isEmpty()) {
+			throw new InitialGrossWeightNotRegisteredException(seal);
+		}
 
 		UsageActivity activity = usageActivityStore.startAtomically(
 				seal,
-				relevantActivities -> usageActivityStarter.start(
-						cylinder,
-						departureWeight,
-						clock.instant(),
-						relevantActivities));
+				relevantActivities -> {
+					if (relevantActivities.stream().anyMatch(UsageActivity::isAwaitingReturnWeight)) {
+						throw new PendingUsageActivityAlreadyExistsException(seal);
+					}
+					return usageActivityStarter.start(
+							cylinder,
+							departureWeight,
+							activityLocation,
+							clock.instant(),
+							relevantActivities);
+				});
 
 		return UsageActivityResult.from(activity);
 	}
