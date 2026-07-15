@@ -40,7 +40,15 @@ As entradas da aplicação usam `String` e `BigDecimal`. As saídas são registr
 
 As interfaces `CylinderStore` e `UsageActivityStore` definem operações específicas para cadastro único, atualização do cilindro, início atômico e conclusão da atividade pendente. Os adaptadores `InMemoryCylinderStore` e `InMemoryUsageActivityStore` permitem executar e testar essas operações sem Spring e sem banco de dados. Eles guardam snapshots imutáveis, devolvem reconstruções independentes e preservam o histórico de atividades concluídas usado na validação de um novo início.
 
-Esses adaptadores são temporários, não duráveis e locais ao processo. A atomicidade e a unicidade valem somente para chamadas que compartilham a mesma instância do adaptador na mesma JVM. Não há garantia distribuída, transação de banco de dados, configuração automática de componentes Spring nem integração com as rotas existentes.
+Esses adaptadores são temporários, não duráveis e locais ao processo. A atomicidade e a unicidade valem somente para chamadas que compartilham a mesma instância do adaptador na mesma JVM. Não há garantia distribuída nem transação de banco de dados; a composição Spring adicionada no Milestone 2C.1 não integra os casos de uso às rotas existentes.
+
+## Milestone 2C.1 — Raiz de composição Spring
+
+O `ApplicationConfiguration` é a raiz de composição Spring desta etapa. Ele configura exatamente um bean de `CylinderStore`, `UsageActivityStore`, `Clock`, `CylinderUseCases` e `UsageActivityUseCases`. Os stores usam `InMemoryCylinderStore` e `InMemoryUsageActivityStore`, enquanto o relógio de produção usa `Clock.systemUTC()`.
+
+Os beans usam o escopo singleton padrão: existe uma instância de cada store por contexto da aplicação, compartilhada pelos casos de uso desse contexto. O estado continua somente na memória do processo e é perdido quando o contexto ou o processo termina, inclusive após uma reinicialização. A atomicidade continua limitada às chamadas que compartilham a mesma instância do adaptador na mesma JVM; não há persistência em banco de dados, garantia entre processos ou distribuída, nem gerenciamento de transações pelo Spring.
+
+Esta composição disponibiliza os casos de uso como beans, mas ainda não cria controllers operacionais nem acesso HTTP para cadastrar cilindros ou registrar atividades.
 
 ## Tecnologias
 
@@ -96,6 +104,7 @@ Arquivos importantes:
 - `dev.sasser.refrigerantcontrol.domain`: fundamentos do domínio implementados em Java puro.
 - `dev.sasser.refrigerantcontrol.application`: casos de uso e resultados imutáveis do fluxo normal.
 - `dev.sasser.refrigerantcontrol.application.port`: contratos específicos de armazenamento usados pelos casos de uso.
+- `dev.sasser.refrigerantcontrol.configuration`: raiz de composição que conecta as portas, os adaptadores, o relógio e os casos de uso ao Spring.
 - `dev.sasser.refrigerantcontrol.infrastructure.memory`: adaptadores em memória, não duráveis e independentes de Spring.
 - `application.properties`: nome visível da aplicação.
 - `home.html`: página inicial renderizada pelo Thymeleaf.
@@ -252,7 +261,7 @@ No estado atual do projeto ainda não existem:
 - garantia de unicidade global dos lacres entre processos ou instâncias diferentes dos adaptadores em memória;
 - dashboard;
 - controllers, formulários ou telas para operar gases, cilindros e atividades;
-- configuração Spring ou acesso HTTP para os novos casos de uso;
+- acesso HTTP para os casos de uso configurados;
 - conversão de datas para apresentação em `America/Sao_Paulo`;
 - ciclo de cilindro vazio, correção, cancelamento ou importação;
 - identificação persistente de atividades, relatórios, backup ou exportação;
@@ -265,3 +274,5 @@ Ao concluir o primeiro marco, o desenvolvedor entende como Java, Maven, Spring B
 O Milestone 2B.1 acrescenta o aprendizado sobre objetos de valor, identidade de entidades, imutabilidade, `Optional`, igualdade de `BigDecimal`, transições de estado e testes unitários determinísticos sem Spring.
 
 O Milestone 2B.2 demonstra como casos de uso coordenam o domínio, como portas evitam acoplamento a uma tecnologia de persistência, como um `Clock` torna o tempo determinístico e como snapshots impedem que referências mutáveis alterem acidentalmente o estado armazenado.
+
+O Milestone 2C.1 apresenta a raiz de composição, onde as dependências concretas são conectadas. A inversão de dependência mantém os casos de uso ligados às portas, a injeção por construtor entrega essas dependências sem setters, o escopo singleton preserva uma instância por contexto e o `Clock` injetado separa a obtenção do tempo das regras da aplicação.
