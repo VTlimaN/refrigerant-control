@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Cadastro de cilindros | Controle de Gases Refrigerantes</title>
+	<link rel="stylesheet" href="/css/application.css" th:href="@{/css/application.css}">
+</head>
+<body>
+	<main class="page-shell">
+		<header class="page-header">
+			<a class="back-link" href="/" th:href="@{/}">Voltar ao início</a>
+			<p class="eyebrow">Operação de cilindros</p>
+			<h1>Cadastro de cilindros</h1>
+			<p>Cadastre o lacre e o gás do cilindro. O peso bruto inicial pode ser registrado logo depois.</p>
+		</header>
+
+		<div class="message message-success" role="status" th:if="${successMessage}" th:text="${successMessage}"></div>
+
+		<aside class="message message-warning" role="note">
+			Os dados cadastrados nesta etapa ficam apenas na memória e serão perdidos quando a aplicação for reiniciada.
+		</aside>
+
+		<div class="form-grid">
+			<section class="form-card" aria-labelledby="cylinder-registration-title">
+				<h2 id="cylinder-registration-title">Cadastrar cilindro</h2>
+				<p>Informe somente a identificação permanente e o gás operacional.</p>
+
+				<form method="post" action="/cylinders" th:action="@{/cylinders}"
+						th:object="${cylinderRegistrationForm}">
+					<div class="form-error-summary" role="alert" th:if="${#fields.hasGlobalErrors()}">
+						<p th:each="error : ${#fields.globalErrors()}" th:text="${error}"></p>
+					</div>
+
+					<div class="field-group">
+						<label for="cylinder-seal-number">Número do lacre</label>
+						<input id="cylinder-seal-number" type="text" required autocomplete="off"
+								th:field="*{sealNumber}" aria-describedby="cylinder-seal-number-error"
+								th:attr="aria-invalid=${#fields.hasErrors('sealNumber')}">
+						<p id="cylinder-seal-number-error" class="field-error" role="alert"
+								th:if="${#fields.hasErrors('sealNumber')}" th:errors="*{sealNumber}"></p>
+					</div>
+
+					<div class="field-group">
+						<label for="operational-refrigerant-name">Gás refrigerante</label>
+						<select id="operational-refrigerant-name" required th:field="*{operationalRefrigerantName}"
+								aria-describedby="operational-refrigerant-name-error"
+								th:attr="aria-invalid=${#fields.hasErrors('operationalRefrigerantName')}">
+							<option value="">Selecione o gás</option>
+							<option th:each="operationalName : ${operationalRefrigerantNames}"
+									th:value="${operationalName}" th:text="${operationalName}"></option>
+						</select>
+						<p id="operational-refrigerant-name-error" class="field-error" role="alert"
+								th:if="${#fields.hasErrors('operationalRefrigerantName')}"
+								th:errors="*{operationalRefrigerantName}"></p>
+					</div>
+
+					<button type="submit">Cadastrar cilindro</button>
+				</form>
+			</section>
+
+			<section class="form-card" aria-labelledby="initial-weight-title">
+				<h2 id="initial-weight-title">Registrar peso bruto inicial</h2>
+				<p>Informe a primeira medição do cilindro antes do primeiro uso.</p>
+
+				<form method="post" action="/cylinders/initial-weight" th:action="@{/cylinders/initial-weight}"
+						th:object="${initialGrossWeightForm}">
+					<div class="form-error-summary" role="alert" th:if="${#fields.hasGlobalErrors()}">
+						<p th:each="error : ${#fields.globalErrors()}" th:text="${error}"></p>
+					</div>
+
+					<div class="field-group">
+						<label for="initial-weight-seal-number">Número do lacre</label>
+						<input id="initial-weight-seal-number" type="text" required autocomplete="off"
+								th:field="*{sealNumber}" aria-describedby="initial-weight-seal-number-error"
+								th:attr="aria-invalid=${#fields.hasErrors('sealNumber')}">
+						<p id="initial-weight-seal-number-error" class="field-error" role="alert"
+								th:if="${#fields.hasErrors('sealNumber')}" th:errors="*{sealNumber}"></p>
+					</div>
+
+					<div class="field-group">
+						<label for="initial-gross-weight">Peso bruto inicial (kg)</label>
+						<div class="input-with-unit">
+							<input id="initial-gross-weight" type="text" required inputmode="decimal" placeholder="15,140"
+									th:field="*{initialGrossWeight}" aria-describedby="initial-gross-weight-hint initial-gross-weight-error"
+									th:attr="aria-invalid=${#fields.hasErrors('initialGrossWeight')}">
+							<span aria-hidden="true">kg</span>
+						</div>
+						<p id="initial-gross-weight-hint" class="field-hint">Use vírgula ou ponto como separador decimal.</p>
+						<p id="initial-gross-weight-error" class="field-error" role="alert"
+								th:if="${#fields.hasErrors('initialGrossWeight')}" th:errors="*{initialGrossWeight}"></p>
+					</div>
+
+					<button type="submit">Registrar peso inicial</button>
+				</form>
+			</section>
+		</div>
+	</main>
+</body>
+</html>

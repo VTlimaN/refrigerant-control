@@ -1,11 +1,11 @@
 package dev.sasser.refrigerantcontrol.domain;
 
+import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 public final class RefrigerantGas {
 
-	private static final Set<String> CONFIRMED_OPERATIONAL_NAMES = Set.of(
+	private static final List<String> SUPPORTED_OPERATIONAL_NAMES = List.of(
 			"R410A",
 			"R32",
 			"R-22",
@@ -18,13 +18,17 @@ public final class RefrigerantGas {
 
 	private RefrigerantGas(String operationalName) {
 		this.operationalName = Objects.requireNonNull(operationalName, "operational name must not be null");
-		if (!CONFIRMED_OPERATIONAL_NAMES.contains(operationalName)) {
+		if (!SUPPORTED_OPERATIONAL_NAMES.contains(operationalName)) {
 			throw new IllegalArgumentException("unsupported operational refrigerant name");
 		}
 	}
 
 	public static RefrigerantGas of(String operationalName) {
 		return new RefrigerantGas(operationalName);
+	}
+
+	public static List<String> supportedOperationalNames() {
+		return SUPPORTED_OPERATIONAL_NAMES;
 	}
 
 	public String operationalName() {

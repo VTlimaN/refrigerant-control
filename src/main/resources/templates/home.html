@@ -4,13 +4,19 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Controle de Gases Refrigerantes</title>
+	<link rel="stylesheet" href="/css/application.css" th:href="@{/css/application.css}">
 </head>
 <body>
-	<main>
-		<h1>Controle de Gases Refrigerantes</h1>
-		<p>Esta página confirma a verificação inicial do ambiente de desenvolvimento.</p>
-		<p>A aplicação está em execução.</p>
-		<a href="/status" th:href="@{/status}">Ver status da aplicação (/status)</a>
+	<main class="page-shell home-page">
+		<section class="hero-card">
+			<h1>Controle de Gases Refrigerantes</h1>
+			<p>Esta página confirma a verificação inicial do ambiente de desenvolvimento.</p>
+			<p>A aplicação está em execução.</p>
+			<nav class="action-row" aria-label="Ações principais">
+				<a class="button-link button-primary" href="/cylinders" th:href="@{/cylinders}">Cadastrar cilindro</a>
+				<a class="button-link button-secondary" href="/status" th:href="@{/status}">Ver status da aplicação (/status)</a>
+			</nav>
+		</section>
 	</main>
 </body>
 </html>
