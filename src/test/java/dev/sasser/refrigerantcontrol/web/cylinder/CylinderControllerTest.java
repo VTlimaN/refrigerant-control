@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -27,13 +28,13 @@ import static org.hamcrest.Matchers.hasProperty;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -62,6 +63,8 @@ class CylinderControllerTest {
 				.andExpect(content().string(containsString("<form method=\"post\" action=\"/cylinders\">")))
 				.andExpect(content().string(containsString("<form method=\"post\" action=\"/cylinders/initial-weight\">")))
 				.andExpect(content().string(containsString("href=\"/\"")))
+				.andExpect(content().string(containsString("href=\"/activities/start\"")))
+				.andExpect(content().string(containsString("Iniciar atividade")))
 				.andExpect(content().string(containsString("for=\"cylinder-seal-number\">Número do lacre")))
 				.andExpect(content().string(containsString("for=\"operational-refrigerant-name\">Gás refrigerante")))
 				.andExpect(content().string(containsString("for=\"initial-gross-weight\">Peso bruto inicial")))
@@ -72,7 +75,7 @@ class CylinderControllerTest {
 						"Os dados cadastrados nesta etapa ficam apenas na memória e serão perdidos quando a aplicação for reiniciada.")))
 				.andExpect(content().string(not(containsString("name=\"departureGrossWeight\""))))
 				.andExpect(content().string(not(containsString("name=\"returnGrossWeight\""))))
-				.andExpect(content().string(not(containsString("/activities"))));
+				.andExpect(content().string(not(containsString("action=\"/activities/start\""))));
 	}
 
 	@Test
@@ -201,12 +204,74 @@ class CylinderControllerTest {
 		String sealNumber = "WEB-INITIAL-WEIGHT-006";
 		cylinderUseCases.registerCylinder(sealNumber, "R407C");
 
-		mockMvc.perform(post("/cylinders/initial-weight")
+		MvcResult registration = mockMvc.perform(post("/cylinders/initial-weight")
 					.param("sealNumber", sealNumber)
 					.param("initialGrossWeight", "15,140"))
 				.andExpect(status().is3xxRedirection())
-				.andExpect(redirectedUrl("/cylinders"))
-				.andExpect(flash().attribute("successMessage", "Peso bruto inicial registrado com sucesso."));
+				.andExpect(flash().attribute("successMessage", "Peso bruto inicial registrado com sucesso."))
+				.andReturn();
+
+		URI redirectUri = URI.create(registration.getResponse().getRedirectedUrl());
+		assertEquals("/activities/start", redirectUri.getPath());
+		assertEquals(sealNumber, decodeSealQuery(redirectUri));
+
+		BigDecimal storedWeight = findCylinder(sealNumber).initialGrossWeight().orElseThrow().inKilograms();
+		assertEquals(new BigDecimal("15.140"), storedWeight);
+		assertEquals(3, storedWeight.scale());
+	}
+
+	@Test
+	void shouldSafelyRedirectSpecialSealToActivityStartAndConsumeSuccessFlashOnce() throws Exception {
+		String sealNumber = "WEB INITIAL / + 010";
+		cylinderUseCases.registerCylinder(sealNumber, "R410A");
+
+		MvcResult registration = mockMvc.perform(post("/cylinders/initial-weight")
+					.param("sealNumber", sealNumber)
+					.param("initialGrossWeight", "15,140"))
+				.andExpect(status().is3xxRedirection())
+				.andExpect(flash().attribute("successMessage", "Peso bruto inicial registrado com sucesso."))
+				.andReturn();
+
+		String location = registration.getResponse().getRedirectedUrl();
+		URI redirectUri = URI.create(location);
+		String decodedSeal = decodeSealQuery(redirectUri);
+		MockHttpSession session = (MockHttpSession) registration.getRequest().getSession(false);
+
+		assertEquals("/activities/start", redirectUri.getPath());
+		assertEquals(sealNumber, decodedSeal);
+		assertFalse(location.startsWith("//"));
+		assertNotNull(session);
+
+		mockMvc.perform(get(redirectUri)
+					.session(session)
+					.with(request -> {
+						request.setParameter("seal", decodedSeal);
+						return request;
+					}))
+				.andExpect(status().isOk())
+				.andExpect(view().name("activity-start"))
+				.andExpect(model().attribute(
+						"activityStartForm",
+						hasProperty("sealNumber", equalTo(sealNumber))))
+				.andExpect(model().attribute(
+						"successMessage",
+						"Peso bruto inicial registrado com sucesso."));
+
+		BigDecimal weightAfterFirstGet = findCylinder(sealNumber).initialGrossWeight().orElseThrow().inKilograms();
+		assertEquals(new BigDecimal("15.140"), weightAfterFirstGet);
+		assertEquals(3, weightAfterFirstGet.scale());
+
+		mockMvc.perform(get(redirectUri)
+					.session(session)
+					.with(request -> {
+						request.setParameter("seal", decodedSeal);
+						return request;
+					}))
+				.andExpect(status().isOk())
+				.andExpect(model().attribute(
+						"activityStartForm",
+						hasProperty("sealNumber", equalTo(sealNumber))))
+				.andExpect(model().attributeDoesNotExist("successMessage"));
 
 		BigDecimal storedWeight = findCylinder(sealNumber).initialGrossWeight().orElseThrow().inKilograms();
 		assertEquals(new BigDecimal("15.140"), storedWeight);
@@ -310,5 +375,11 @@ class CylinderControllerTest {
 
 	private Cylinder findCylinder(String sealNumber) {
 		return cylinderStore.findBySealNumber(SealNumber.of(sealNumber)).orElseThrow();
+	}
+
+	private String decodeSealQuery(URI redirectUri) {
+		return URLDecoder.decode(
+				redirectUri.getRawQuery().substring("seal=".length()),
+				StandardCharsets.UTF_8);
 	}
 }

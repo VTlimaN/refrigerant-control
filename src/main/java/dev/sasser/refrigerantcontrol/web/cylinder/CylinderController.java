@@ -9,6 +9,7 @@ import dev.sasser.refrigerantcontrol.application.CylinderNotFoundException;
 import dev.sasser.refrigerantcontrol.application.CylinderResult;
 import dev.sasser.refrigerantcontrol.application.CylinderUseCases;
 import dev.sasser.refrigerantcontrol.domain.RefrigerantGas;
+import dev.sasser.refrigerantcontrol.web.support.BrazilianDecimalParser;
 import jakarta.validation.Valid;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
@@ -118,8 +119,9 @@ public final class CylinderController {
 			return CYLINDERS_VIEW;
 		}
 
+		CylinderResult result;
 		try {
-			cylinderUseCases.registerInitialGrossWeight(form.getSealNumber(), initialGrossWeight);
+			result = cylinderUseCases.registerInitialGrossWeight(form.getSealNumber(), initialGrossWeight);
 		}
 		catch (CylinderNotFoundException exception) {
 			bindingResult.rejectValue(
@@ -143,7 +145,8 @@ public final class CylinderController {
 		}
 
 		redirectAttributes.addFlashAttribute("successMessage", INITIAL_WEIGHT_SUCCESS_MESSAGE);
-		return "redirect:/cylinders";
+		redirectAttributes.addAttribute("seal", result.sealNumber());
+		return "redirect:/activities/start";
 	}
 
 	private boolean hasBindingErrors(BindingResult bindingResult) {

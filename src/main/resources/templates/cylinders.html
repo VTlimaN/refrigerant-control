@@ -13,6 +13,9 @@
 			<p class="eyebrow">Operação de cilindros</p>
 			<h1>Cadastro de cilindros</h1>
 			<p>Cadastre o lacre e o gás do cilindro. O peso bruto inicial pode ser registrado logo depois.</p>
+			<nav class="action-row" aria-label="Ações relacionadas">
+				<a class="button-link button-secondary" href="/activities/start" th:href="@{/activities/start}">Iniciar atividade</a>
+			</nav>
 		</header>
 
 		<div class="message message-success" role="status" th:if="${successMessage}" th:text="${successMessage}"></div>
