@@ -90,7 +90,10 @@ class UsageActivityStarterTest {
 		Cylinder cylinder = readyCylinder("LACRE-001");
 		UsageActivity previousActivity = starter.start(
 				cylinder, DEPARTURE_WEIGHT, ACTIVITY_LOCATION, STARTED_AT, List.of());
-		previousActivity.complete(Weight.of(new BigDecimal("12.10")), STARTED_AT.plusSeconds(60));
+		previousActivity.complete(
+				Weight.of(new BigDecimal("12.10")),
+				STARTED_AT.plusSeconds(60),
+				false);
 
 		UsageActivity nextActivity = starter.start(
 				cylinder,

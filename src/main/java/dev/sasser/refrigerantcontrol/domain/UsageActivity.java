@@ -13,6 +13,7 @@ public final class UsageActivity {
 	private ActivityStatus status;
 	private Weight returnGrossWeight;
 	private Instant completedAt;
+	private boolean zeroConsumptionConfirmed;
 
 	private UsageActivity(
 			Cylinder cylinder,
@@ -74,11 +75,18 @@ public final class UsageActivity {
 		return Optional.of(departureGrossWeight.subtract(returnGrossWeight));
 	}
 
+	public boolean zeroConsumptionConfirmed() {
+		return zeroConsumptionConfirmed;
+	}
+
 	public boolean isAwaitingReturnWeight() {
 		return status == ActivityStatus.AWAITING_RETURN_WEIGHT;
 	}
 
-	public void complete(Weight returnGrossWeight, Instant completedAt) {
+	public void complete(
+			Weight returnGrossWeight,
+			Instant completedAt,
+			boolean zeroConsumptionConfirmed) {
 		Weight requiredReturnWeight = Objects.requireNonNull(
 				returnGrossWeight,
 				"return gross weight must not be null");
@@ -87,15 +95,20 @@ public final class UsageActivity {
 		if (status != ActivityStatus.AWAITING_RETURN_WEIGHT) {
 			throw new IllegalStateException("activity is already completed");
 		}
-		if (requiredReturnWeight.compareTo(departureGrossWeight) > 0) {
+		int weightComparison = requiredReturnWeight.compareTo(departureGrossWeight);
+		if (weightComparison > 0) {
 			throw new IllegalArgumentException("return gross weight must not be greater than departure gross weight");
 		}
 		if (requiredCompletedAt.isBefore(startedAt)) {
 			throw new IllegalArgumentException("completed at must not be before started at");
 		}
+		if (weightComparison == 0 && !zeroConsumptionConfirmed) {
+			throw new IllegalStateException("zero consumption must be confirmed");
+		}
 
 		this.returnGrossWeight = requiredReturnWeight;
 		this.completedAt = requiredCompletedAt;
+		this.zeroConsumptionConfirmed = weightComparison == 0;
 		this.status = ActivityStatus.COMPLETED;
 	}
 }

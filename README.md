@@ -78,6 +78,16 @@ O cilindro precisa existir e ter o peso bruto inicial registrado. Também não p
 
 As atividades e os cilindros continuam armazenados somente na memória da JVM. Todos esses dados são perdidos quando a aplicação ou seu contexto é reiniciado. Esta etapa não oferece interface de retorno, interface de conclusão, interface de consumo, histórico de atividades, persistência, autenticação nem uma interface operacional completa.
 
+## Milestone 2C.4A — Contrato de aplicação para conclusão de atividade
+
+A conclusão da atividade pendente agora exige uma confirmação explícita quando o peso bruto de retorno é numericamente igual ao peso bruto de saída. Essa igualdade produz consumo zero. Uma tentativa sem confirmação não altera a atividade: ela continua aguardando o peso de retorno, sem peso de retorno, instante de conclusão ou consumo registrados.
+
+Quando o consumo zero é confirmado, a mesma atividade passa para `COMPLETED`. Os pesos brutos de saída e retorno permanecem registrados com seus valores e escalas originais, `zeroConsumptionConfirmed` registra a confirmação com valor `true` e `completedAt`, obtido do `Clock` injetado, registra o instante do evento confirmado. Em uma conclusão com consumo diferente de zero, `zeroConsumptionConfirmed` sempre permanece `false`, mesmo que o chamador forneça confirmação.
+
+Pesos de retorno negativos e pesos de retorno maiores que o peso de saída agora produzem falhas de aplicação tipadas e distintas. A validação da relação entre os pesos e da confirmação ocorre dentro da operação atômica do `UsageActivityStore`; uma falha não substitui o snapshot pendente e permite uma nova tentativa válida. As regras continuam protegidas também pelo domínio.
+
+Este marco altera somente o contrato interno de domínio, aplicação e armazenamento em memória. Ainda não existe rota, controller, formulário, template ou navegação para registrar o retorno. O armazenamento continua temporário na memória da JVM, e todos os dados são perdidos quando a aplicação ou seu contexto é reiniciado. Não há persistência, histórico, autenticação nem interface operacional de conclusão.
+
 ## Tecnologias
 
 ### Java 25
@@ -328,3 +338,5 @@ O Milestone 2C.2 demonstra como formulários de apresentação, Bean Validation,
 O Milestone 2C.3A demonstra como uma informação obrigatória atravessa agregado, caso de uso, resultado e snapshot sem perder seu valor original. Exceções específicas tornam falhas operacionais distinguíveis, e a verificação da atividade pendente permanece dentro da fronteira atômica do adapter em memória.
 
 O Milestone 2C.3B demonstra como iniciar uma atividade por uma página server-rendered com apenas os dados que o operador precisa informar. O fluxo deriva o gás do cilindro, mantém tempo e situação sob responsabilidade da aplicação, compartilha o parser decimal entre controllers, aplica POST/Redirect/GET e apresenta um resumo escapado sem expor campos internos ou antecipar as interfaces de retorno, conclusão, consumo e histórico.
+
+O Milestone 2C.4A demonstra como uma confirmação operacional obrigatória atravessa agregado, caso de uso, resultado imutável e snapshot sem criar uma interface prematuramente. A conclusão continua atômica, falhas tipadas distinguem pesos negativos, retorno maior que saída e consumo zero não confirmado, e o `Clock` permanece a única origem de `completedAt`.
