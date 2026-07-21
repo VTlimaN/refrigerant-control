@@ -1,4 +1,4 @@
-package dev.sasser.refrigerantcontrol.web.cylinder;
+package dev.sasser.refrigerantcontrol.web.support;
 
 import java.math.BigDecimal;
 

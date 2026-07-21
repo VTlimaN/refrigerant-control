@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Iniciar atividade | Controle de Gases Refrigerantes</title>
+	<link rel="stylesheet" href="/css/application.css" th:href="@{/css/application.css}">
+</head>
+<body>
+	<main class="page-shell">
+		<header class="page-header">
+			<a class="back-link" href="/" th:href="@{/}">Voltar ao início</a>
+			<p class="eyebrow">Operação de atividades</p>
+			<h1>Iniciar atividade</h1>
+			<p>Informe o cilindro, o peso bruto de saída e o local para iniciar uma atividade.</p>
+			<nav class="action-row" aria-label="Ações relacionadas">
+				<a class="button-link button-secondary" href="/cylinders" th:href="@{/cylinders}">Cadastrar cilindro</a>
+			</nav>
+		</header>
+
+		<div class="message message-success" role="status" th:if="${successMessage}" th:text="${successMessage}"></div>
+
+		<aside class="message message-warning" role="note">
+			Os dados cadastrados nesta etapa ficam apenas na memória e serão perdidos quando a aplicação for reiniciada.
+		</aside>
+
+		<div class="form-grid">
+			<section class="form-card" aria-labelledby="activity-start-title">
+				<h2 id="activity-start-title">Dados da atividade</h2>
+
+				<form method="post" action="/activities/start" th:action="@{/activities/start}"
+						th:object="${activityStartForm}">
+					<div class="form-error-summary" role="alert" th:if="${#fields.hasGlobalErrors()}">
+						<p th:each="error : ${#fields.globalErrors()}" th:text="${error}"></p>
+					</div>
+
+					<div class="field-group">
+						<label for="activity-seal-number">Número do lacre</label>
+						<input id="activity-seal-number" type="text" required autocomplete="off"
+								th:field="*{sealNumber}" aria-describedby="activity-seal-number-error"
+								th:attr="aria-invalid=${#fields.hasErrors('sealNumber')}">
+						<p id="activity-seal-number-error" class="field-error" role="alert"
+								th:if="${#fields.hasErrors('sealNumber')}" th:errors="*{sealNumber}"></p>
+					</div>
+
+					<div class="field-group">
+						<label for="departure-gross-weight">Peso bruto de saída (kg)</label>
+						<div class="input-with-unit">
+							<input id="departure-gross-weight" type="text" required inputmode="decimal" placeholder="15,140"
+									th:field="*{departureGrossWeight}"
+									aria-describedby="departure-gross-weight-hint departure-gross-weight-error"
+									th:attr="aria-invalid=${#fields.hasErrors('departureGrossWeight')}">
+							<span aria-hidden="true">kg</span>
+						</div>
+						<p id="departure-gross-weight-hint" class="field-hint">Use vírgula ou ponto como separador decimal.</p>
+						<p id="departure-gross-weight-error" class="field-error" role="alert"
+								th:if="${#fields.hasErrors('departureGrossWeight')}"
+								th:errors="*{departureGrossWeight}"></p>
+					</div>
+
+					<div class="field-group">
+						<label for="activity-location">Local da atividade</label>
+						<input id="activity-location" type="text" required autocomplete="off"
+								th:field="*{activityLocation}" aria-describedby="activity-location-error"
+								th:attr="aria-invalid=${#fields.hasErrors('activityLocation')}">
+						<p id="activity-location-error" class="field-error" role="alert"
+								th:if="${#fields.hasErrors('activityLocation')}" th:errors="*{activityLocation}"></p>
+					</div>
+
+					<button type="submit">Iniciar atividade</button>
+				</form>
+			</section>
+
+			<section class="form-card" aria-labelledby="started-activity-title" th:if="${startedActivity}">
+				<h2 id="started-activity-title">Atividade iniciada</h2>
+				<p><strong>Número do lacre:</strong> <span th:text="${startedActivity.sealNumber}"></span></p>
+				<p><strong>Local da atividade:</strong> <span th:text="${startedActivity.activityLocation}"></span></p>
+				<p><strong>Situação:</strong> Aguardando peso de retorno</p>
+			</section>
+		</div>
+	</main>
+</body>
+</html>

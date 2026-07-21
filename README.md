@@ -68,6 +68,16 @@ O início de uma `UsageActivity` agora exige `activityLocation` como texto livre
 
 Esta etapa altera somente o contrato interno de domínio e aplicação. Ainda não existe controller, formulário, template ou rota HTTP para iniciar atividades.
 
+## Milestone 2C.3B — Fluxo web de início de atividade
+
+O início de atividade está disponível em `GET /activities/start`. A página apresenta somente os três campos necessários para a operação diária: número do lacre, peso bruto de saída em quilogramas e local da atividade. O envio usa `POST /activities/start` e, quando concluído com sucesso, aplica POST/Redirect/GET para voltar à rota fixa de início sem repetir a operação ao atualizar a página.
+
+O lacre e o local não vazios são entregues ao caso de uso exatamente como informados, preservando espaços externos e internos, capitalização, acentos e pontuação. Somente o texto do peso remove espaços externos; ele aceita vírgula ou ponto como separador decimal e é convertido diretamente para `BigDecimal`, mantendo a escala e sem usar `double` ou arredondamento. O gás é obtido internamente do cilindro cadastrado, o instante `startedAt` é gerado automaticamente por `UsageActivityUseCases` com seu `Clock` injetado e a situação inicial é automaticamente `AWAITING_RETURN_WEIGHT`.
+
+O cilindro precisa existir e ter o peso bruto inicial registrado. Também não pode haver outra atividade do mesmo cilindro aguardando o peso de retorno. Depois do registro bem-sucedido do peso inicial, o fluxo redireciona para a página de início da atividade com o lacre preenchido por `RedirectAttributes`. Falhas de formulário e de negócio permanecem na página, preservam as entradas e exibem mensagens fixas em português sem revelar detalhes técnicos.
+
+As atividades e os cilindros continuam armazenados somente na memória da JVM. Todos esses dados são perdidos quando a aplicação ou seu contexto é reiniciado. Esta etapa não oferece interface de retorno, interface de conclusão, interface de consumo, histórico de atividades, persistência, autenticação nem uma interface operacional completa.
+
 ## Tecnologias
 
 ### Java 25
@@ -84,11 +94,11 @@ Spring Boot configura e inicia a aplicação Java. O plugin do Spring Boot tamb�
 
 ### Spring MVC
 
-Spring MVC recebe as requisições HTTP. Ele atende a página inicial, o status e o fluxo de cadastro em `/cylinders`.
+Spring MVC recebe as requisições HTTP. Ele atende a página inicial, o status, o fluxo de cadastro em `/cylinders` e o início de atividade em `/activities/start`.
 
 ### Thymeleaf
 
-Thymeleaf renderiza `home.html` e `cylinders.html` no servidor. Os formulários preservam entradas válidas após erros e exibem mensagens escapadas por padrão.
+Thymeleaf renderiza `home.html`, `cylinders.html` e `activity-start.html` no servidor. Os formulários preservam entradas válidas após erros e exibem mensagens escapadas por padrão.
 
 ### Tomcat embarcado
 
@@ -124,10 +134,13 @@ Arquivos importantes:
 - `dev.sasser.refrigerantcontrol.application.port`: contratos específicos de armazenamento usados pelos casos de uso.
 - `dev.sasser.refrigerantcontrol.configuration`: raiz de composição que conecta as portas, os adaptadores, o relógio e os casos de uso ao Spring.
 - `dev.sasser.refrigerantcontrol.infrastructure.memory`: adaptadores em memória, não duráveis e independentes de Spring.
-- `dev.sasser.refrigerantcontrol.web.cylinder`: controller, formulários e conversão decimal do cadastro operacional de cilindros.
+- `dev.sasser.refrigerantcontrol.web.cylinder`: controller e formulários do cadastro operacional de cilindros.
+- `dev.sasser.refrigerantcontrol.web.activity`: controller e formulário do início de atividade.
+- `dev.sasser.refrigerantcontrol.web.support`: conversão decimal compartilhada pelos fluxos web.
 - `application.properties`: nome visível da aplicação.
 - `home.html`: página inicial renderizada pelo Thymeleaf.
 - `cylinders.html`: página de cadastro de cilindro e peso bruto inicial.
+- `activity-start.html`: página de início de atividade.
 - `static/css/application.css`: estilos compartilhados, responsivos e sem framework externo.
 - `AGENTS.md`: regras permanentes para futuras sessões do Codex.
 
@@ -202,9 +215,10 @@ Abra o fluxo operacional no navegador em:
 
 ```text
 http://localhost:8080/cylinders
+http://localhost:8080/activities/start
 ```
 
-Os formulários usam requisições `POST`; o navegador é a forma mais simples de verificar a renderização, a validação e os redirecionamentos dessa página.
+Os formulários usam requisições `POST`; o navegador é a forma mais simples de verificar a renderização, a validação e os redirecionamentos dessas páginas. `POST /cylinders` cadastra o cilindro, `POST /cylinders/initial-weight` registra seu peso bruto inicial e `POST /activities/start` inicia a atividade.
 
 Confira o JSON de status:
 
@@ -240,6 +254,7 @@ java -version
 java -jar target/refrigerant-control-0.0.1-SNAPSHOT.jar
 curl --fail http://localhost:8080/
 curl --fail http://localhost:8080/cylinders
+curl --fail http://localhost:8080/activities/start
 curl --fail http://localhost:8080/status
 ```
 
@@ -290,8 +305,9 @@ No estado atual do projeto ainda não existem:
 - persistência durável ou garantia transacional de banco de dados;
 - garantia de unicidade global dos lacres entre processos ou instâncias diferentes dos adaptadores em memória;
 - dashboard;
-- cadastro editável de gases, lista de cilindros ou interface para atividades;
-- acesso HTTP para iniciar atividades, registrar retornos ou consultar histórico;
+- cadastro editável de gases ou lista de cilindros;
+- interface de retorno, conclusão ou consumo de atividades;
+- histórico ou listagem de atividades;
 - conversão de datas para apresentação em `America/Sao_Paulo`;
 - ciclo de cilindro vazio, correção, cancelamento ou importação;
 - identificação persistente de atividades, relatórios, backup ou exportação;
@@ -310,3 +326,5 @@ O Milestone 2C.1 apresenta a raiz de composição, onde as dependências concret
 O Milestone 2C.2 demonstra como formulários de apresentação, Bean Validation, parsing explícito para `BigDecimal`, mensagens de erro e POST/Redirect/GET formam uma fronteira web simples. O controller coordena HTTP e delega as regras aos casos de uso, enquanto o Thymeleaf mantém a saída escapada e uma folha de estilos compartilhada oferece uma interface responsiva sem JavaScript.
 
 O Milestone 2C.3A demonstra como uma informação obrigatória atravessa agregado, caso de uso, resultado e snapshot sem perder seu valor original. Exceções específicas tornam falhas operacionais distinguíveis, e a verificação da atividade pendente permanece dentro da fronteira atômica do adapter em memória.
+
+O Milestone 2C.3B demonstra como iniciar uma atividade por uma página server-rendered com apenas os dados que o operador precisa informar. O fluxo deriva o gás do cilindro, mantém tempo e situação sob responsabilidade da aplicação, compartilha o parser decimal entre controllers, aplica POST/Redirect/GET e apresenta um resumo escapado sem expor campos internos ou antecipar as interfaces de retorno, conclusão, consumo e histórico.
