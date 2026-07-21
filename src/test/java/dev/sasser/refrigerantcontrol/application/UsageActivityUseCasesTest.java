@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.Optional;
@@ -13,6 +14,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -29,6 +31,7 @@ import dev.sasser.refrigerantcontrol.infrastructure.memory.InMemoryCylinderStore
 import dev.sasser.refrigerantcontrol.infrastructure.memory.InMemoryUsageActivityStore;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
@@ -66,6 +69,7 @@ class UsageActivityUseCasesTest {
 		assertTrue(result.returnGrossWeight().isEmpty());
 		assertTrue(result.completedAt().isEmpty());
 		assertTrue(result.consumedQuantity().isEmpty());
+		assertFalse(result.zeroConsumptionConfirmed());
 	}
 
 	@Test
@@ -116,11 +120,11 @@ class UsageActivityUseCasesTest {
 						.startUsageActivity(FIRST_SEAL, new BigDecimal("14.00"), "Second location"));
 		assertEquals(2, trackingStore.startCallbackCalls());
 		usageUseCasesAt(STARTED_AT.plusSeconds(120), trackingStore)
-				.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("12.10"));
+				.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("12.10"), false);
 		assertThrows(
 				PendingUsageActivityNotFoundException.class,
 				() -> usageUseCasesAt(STARTED_AT.plusSeconds(180))
-						.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("11.00")));
+						.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("11.00"), false));
 	}
 
 	@ParameterizedTest
@@ -203,48 +207,98 @@ class UsageActivityUseCasesTest {
 				FIRST_SEAL, new BigDecimal("15.140"), ACTIVITY_LOCATION);
 
 		UsageActivityResult result = usageUseCasesAt(COMPLETED_AT)
-				.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("12.100"));
+				.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("12.100"), false);
 
+		assertEquals(FIRST_SEAL, result.sealNumber());
+		assertEquals(new BigDecimal("15.140"), result.departureGrossWeight());
+		assertEquals(3, result.departureGrossWeight().scale());
 		assertEquals(ActivityStatus.COMPLETED, result.status());
 		assertEquals(new BigDecimal("12.100"), result.returnGrossWeight().orElseThrow());
 		assertEquals(3, result.returnGrossWeight().orElseThrow().scale());
 		assertEquals(COMPLETED_AT, result.completedAt().orElseThrow());
 		assertEquals(new BigDecimal("3.040"), result.consumedQuantity().orElseThrow());
 		assertEquals(ACTIVITY_LOCATION, result.activityLocation());
+		assertFalse(result.zeroConsumptionConfirmed());
+	}
+
+	@Test
+	void shouldNormalizeConfirmationToFalseForNonzeroCompletionAndPreserveExactIdentity() {
+		String sealNumber = "  R 22/001+X Á  ";
+		String location = "  Oficina técnica — Área 7!  ";
+		registerReadyCylinder(sealNumber);
+		usageUseCasesAt(STARTED_AT).startUsageActivity(
+				sealNumber,
+				new BigDecimal("15.140"),
+				location);
+
+		UsageActivityResult result = usageUseCasesAt(COMPLETED_AT)
+				.completePendingUsageActivity(sealNumber, new BigDecimal("12.100"), true);
+
+		assertEquals(sealNumber, result.sealNumber());
+		assertEquals(location, result.activityLocation());
+		assertEquals(new BigDecimal("15.140"), result.departureGrossWeight());
+		assertEquals(new BigDecimal("12.100"), result.returnGrossWeight().orElseThrow());
+		assertEquals(new BigDecimal("3.040"), result.consumedQuantity().orElseThrow());
+		assertEquals(COMPLETED_AT, result.completedAt().orElseThrow());
+		assertEquals(ActivityStatus.COMPLETED, result.status());
+		assertFalse(result.zeroConsumptionConfirmed());
 	}
 
 	@Test
 	void shouldDistinguishUnknownCylinderFromMissingPendingActivity() {
 		assertThrows(
 				CylinderNotFoundException.class,
-				() -> usageUseCasesAt(COMPLETED_AT)
-						.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("12.10")));
+				() -> usageUseCasesWithClock(new UnreadableClock())
+						.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("12.10"), false));
 
 		registerReadyCylinder(FIRST_SEAL);
 		PendingUsageActivityNotFoundException exception = assertThrows(
 				PendingUsageActivityNotFoundException.class,
-				() -> usageUseCasesAt(COMPLETED_AT)
-						.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("12.10")));
+				() -> usageUseCasesWithClock(new UnreadableClock())
+						.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("12.10"), false));
 		assertEquals(
 				"Pending usage activity was not found for seal number: " + FIRST_SEAL,
 				exception.getMessage());
 	}
 
 	@Test
-	void shouldPreservePendingStateAfterInvalidReturnAndAllowValidRetry() {
+	void shouldReturnTypedGreaterFailurePreservePendingStateAndAllowValidRetry() {
 		registerReadyCylinder(FIRST_SEAL);
 		usageUseCasesAt(STARTED_AT).startUsageActivity(
 				FIRST_SEAL, new BigDecimal("15.14"), ACTIVITY_LOCATION);
 
 		assertThrows(
-				IllegalArgumentException.class,
-				() -> usageUseCasesAt(COMPLETED_AT)
-						.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("15.15")));
+				ReturnGrossWeightGreaterThanDepartureException.class,
+				() -> usageUseCasesWithClock(new UnreadableClock())
+						.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("15.15"), false));
+		assertPendingActivity(FIRST_SEAL, new BigDecimal("15.14"));
 
 		UsageActivityResult result = usageUseCasesAt(COMPLETED_AT)
-				.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("12.10"));
+				.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("12.10"), false);
 		assertEquals(ActivityStatus.COMPLETED, result.status());
 		assertEquals(new BigDecimal("3.04"), result.consumedQuantity().orElseThrow());
+		assertFalse(result.zeroConsumptionConfirmed());
+	}
+
+	@Test
+	void shouldReturnTypedNegativeFailurePreservePendingStateAndAllowValidRetry() {
+		registerReadyCylinder(FIRST_SEAL);
+		usageUseCasesAt(STARTED_AT).startUsageActivity(
+				FIRST_SEAL, new BigDecimal("15.140"), ACTIVITY_LOCATION);
+
+		assertThrows(
+				NegativeReturnGrossWeightException.class,
+				() -> usageUseCasesWithClock(new UnreadableClock())
+						.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("-0.001"), false));
+		assertPendingActivity(FIRST_SEAL, new BigDecimal("15.140"));
+
+		UsageActivityResult result = usageUseCasesAt(COMPLETED_AT)
+				.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("12.100"), false);
+
+		assertEquals(ActivityStatus.COMPLETED, result.status());
+		assertEquals(new BigDecimal("12.100"), result.returnGrossWeight().orElseThrow());
+		assertEquals(COMPLETED_AT, result.completedAt().orElseThrow());
+		assertFalse(result.zeroConsumptionConfirmed());
 	}
 
 	@Test
@@ -256,22 +310,34 @@ class UsageActivityUseCasesTest {
 		assertThrows(
 				IllegalArgumentException.class,
 				() -> usageUseCasesAt(STARTED_AT.minusSeconds(1))
-						.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("12.10")));
+						.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("12.10"), false));
+		assertPendingActivity(FIRST_SEAL, new BigDecimal("15.14"));
 
 		UsageActivityResult result = usageUseCasesAt(COMPLETED_AT)
-				.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("12.10"));
+				.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("12.10"), false);
 		assertEquals(COMPLETED_AT, result.completedAt().orElseThrow());
 	}
 
 	@Test
-	void shouldAllowZeroConsumptionAndAllowLaterActivityAfterCompletion() {
+	void shouldRequireZeroConfirmationPreservePendingStateAndAllowConfirmedRetry() {
 		registerReadyCylinder(FIRST_SEAL);
 		usageUseCasesAt(STARTED_AT).startUsageActivity(
 				FIRST_SEAL, new BigDecimal("15.140"), ACTIVITY_LOCATION);
+		assertThrows(
+				ZeroConsumptionConfirmationRequiredException.class,
+				() -> usageUseCasesWithClock(new UnreadableClock())
+						.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("15.14"), false));
+		assertPendingActivity(FIRST_SEAL, new BigDecimal("15.140"));
+
 		UsageActivityResult completed = usageUseCasesAt(COMPLETED_AT)
-				.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("15.14"));
+				.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("15.14"), true);
 
 		assertEquals(new BigDecimal("0.000"), completed.consumedQuantity().orElseThrow());
+		assertEquals(3, completed.consumedQuantity().orElseThrow().scale());
+		assertEquals(new BigDecimal("15.14"), completed.returnGrossWeight().orElseThrow());
+		assertEquals(2, completed.returnGrossWeight().orElseThrow().scale());
+		assertEquals(COMPLETED_AT, completed.completedAt().orElseThrow());
+		assertTrue(completed.zeroConsumptionConfirmed());
 		UsageActivityResult next = usageUseCasesAt(COMPLETED_AT.plusSeconds(60))
 				.startUsageActivity(FIRST_SEAL, new BigDecimal("15.14"), "Second location");
 		assertEquals(ActivityStatus.AWAITING_RETURN_WEIGHT, next.status());
@@ -282,12 +348,13 @@ class UsageActivityUseCasesTest {
 		registerReadyCylinder(FIRST_SEAL);
 		usageUseCasesAt(STARTED_AT).startUsageActivity(
 				FIRST_SEAL, new BigDecimal("15.14"), ACTIVITY_LOCATION);
-		usageUseCasesAt(COMPLETED_AT).completePendingUsageActivity(FIRST_SEAL, new BigDecimal("12.10"));
+		usageUseCasesAt(COMPLETED_AT)
+				.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("12.10"), false);
 
 		assertThrows(
 				PendingUsageActivityNotFoundException.class,
-				() -> usageUseCasesAt(COMPLETED_AT.plusSeconds(1))
-						.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("11.00")));
+				() -> usageUseCasesWithClock(new UnreadableClock())
+						.completePendingUsageActivity(FIRST_SEAL, new BigDecimal("11.00"), false));
 	}
 
 	@Test
@@ -307,10 +374,11 @@ class UsageActivityUseCasesTest {
 		assertThrows(
 				NullPointerException.class,
 				() -> usageUseCasesAt(COMPLETED_AT)
-						.completePendingUsageActivity(null, new BigDecimal("12.10")));
+						.completePendingUsageActivity(null, new BigDecimal("12.10"), false));
 		assertThrows(
 				NullPointerException.class,
-				() -> usageUseCasesAt(COMPLETED_AT).completePendingUsageActivity(FIRST_SEAL, null));
+				() -> usageUseCasesAt(COMPLETED_AT)
+						.completePendingUsageActivity(FIRST_SEAL, null, false));
 	}
 
 	@Test
@@ -326,33 +394,52 @@ class UsageActivityUseCasesTest {
 				ActivityStatus.COMPLETED,
 				Optional.of(returned),
 				Optional.of(COMPLETED_AT),
-				Optional.of(consumed));
+				Optional.of(consumed),
+				false);
 
 		assertEquals(3, result.departureGrossWeight().scale());
 		assertEquals(ACTIVITY_LOCATION, result.activityLocation());
 		assertEquals(3, result.returnGrossWeight().orElseThrow().scale());
 		assertEquals(3, result.consumedQuantity().orElseThrow().scale());
+		assertFalse(result.zeroConsumptionConfirmed());
+		UsageActivityResult confirmedZero = new UsageActivityResult(
+				FIRST_SEAL,
+				departure,
+				ACTIVITY_LOCATION,
+				STARTED_AT,
+				ActivityStatus.COMPLETED,
+				Optional.of(departure),
+				Optional.of(COMPLETED_AT),
+				Optional.of(new BigDecimal("0.000")),
+				true);
+		assertTrue(confirmedZero.zeroConsumptionConfirmed());
+		assertThrows(IllegalArgumentException.class, () -> new UsageActivityResult(
+				FIRST_SEAL, departure, ACTIVITY_LOCATION, STARTED_AT, ActivityStatus.COMPLETED,
+				Optional.of(departure), Optional.of(COMPLETED_AT), Optional.of(new BigDecimal("0.000")), false));
+		assertThrows(IllegalArgumentException.class, () -> new UsageActivityResult(
+				FIRST_SEAL, departure, ACTIVITY_LOCATION, STARTED_AT, ActivityStatus.COMPLETED,
+				Optional.of(returned), Optional.of(COMPLETED_AT), Optional.of(consumed), true));
 		assertThrows(NullPointerException.class, () -> new UsageActivityResult(
 				null, departure, ACTIVITY_LOCATION, STARTED_AT, ActivityStatus.COMPLETED,
-				Optional.of(returned), Optional.of(COMPLETED_AT), Optional.of(consumed)));
+				Optional.of(returned), Optional.of(COMPLETED_AT), Optional.of(consumed), false));
 		assertThrows(NullPointerException.class, () -> new UsageActivityResult(
 				FIRST_SEAL, null, ACTIVITY_LOCATION, STARTED_AT, ActivityStatus.COMPLETED,
-				Optional.of(returned), Optional.of(COMPLETED_AT), Optional.of(consumed)));
+				Optional.of(returned), Optional.of(COMPLETED_AT), Optional.of(consumed), false));
 		assertThrows(NullPointerException.class, () -> new UsageActivityResult(
 				FIRST_SEAL, departure, ACTIVITY_LOCATION, null, ActivityStatus.COMPLETED,
-				Optional.of(returned), Optional.of(COMPLETED_AT), Optional.of(consumed)));
+				Optional.of(returned), Optional.of(COMPLETED_AT), Optional.of(consumed), false));
 		assertThrows(NullPointerException.class, () -> new UsageActivityResult(
 				FIRST_SEAL, departure, ACTIVITY_LOCATION, STARTED_AT, null,
-				Optional.of(returned), Optional.of(COMPLETED_AT), Optional.of(consumed)));
+				Optional.of(returned), Optional.of(COMPLETED_AT), Optional.of(consumed), false));
 		assertThrows(NullPointerException.class, () -> new UsageActivityResult(
 				FIRST_SEAL, departure, ACTIVITY_LOCATION, STARTED_AT, ActivityStatus.COMPLETED,
-				null, Optional.of(COMPLETED_AT), Optional.of(consumed)));
+				null, Optional.of(COMPLETED_AT), Optional.of(consumed), false));
 		assertThrows(NullPointerException.class, () -> new UsageActivityResult(
 				FIRST_SEAL, departure, ACTIVITY_LOCATION, STARTED_AT, ActivityStatus.COMPLETED,
-				Optional.of(returned), null, Optional.of(consumed)));
+				Optional.of(returned), null, Optional.of(consumed), false));
 		assertThrows(NullPointerException.class, () -> new UsageActivityResult(
 				FIRST_SEAL, departure, ACTIVITY_LOCATION, STARTED_AT, ActivityStatus.COMPLETED,
-				Optional.of(returned), Optional.of(COMPLETED_AT), null));
+				Optional.of(returned), Optional.of(COMPLETED_AT), null, false));
 	}
 
 	@ParameterizedTest
@@ -367,7 +454,8 @@ class UsageActivityUseCasesTest {
 				ActivityStatus.AWAITING_RETURN_WEIGHT,
 				Optional.empty(),
 				Optional.empty(),
-				Optional.empty()));
+				Optional.empty(),
+				false));
 	}
 
 	private void registerReadyCylinder(String sealNumber) {
@@ -380,10 +468,18 @@ class UsageActivityUseCasesTest {
 	}
 
 	private UsageActivityUseCases usageUseCasesAt(Instant instant, UsageActivityStore usageActivityStore) {
+		return usageUseCasesWithClock(Clock.fixed(instant, ZoneOffset.UTC), usageActivityStore);
+	}
+
+	private UsageActivityUseCases usageUseCasesWithClock(Clock clock) {
+		return usageUseCasesWithClock(clock, activityStore);
+	}
+
+	private UsageActivityUseCases usageUseCasesWithClock(Clock clock, UsageActivityStore usageActivityStore) {
 		return new UsageActivityUseCases(
 				cylinderStore,
 				usageActivityStore,
-				Clock.fixed(instant, ZoneOffset.UTC));
+				clock);
 	}
 
 	private int storedActivityCount(String sealNumber) {
@@ -395,6 +491,24 @@ class UsageActivityUseCasesTest {
 					throw new InspectionCompleteException();
 				}));
 		return count.get();
+	}
+
+	private void assertPendingActivity(String sealNumber, BigDecimal departureGrossWeight) {
+		AtomicReference<UsageActivity> storedActivity = new AtomicReference<>();
+		assertThrows(InspectionCompleteException.class, () -> activityStore.startAtomically(
+				SealNumber.of(sealNumber),
+				activities -> {
+					assertEquals(1, activities.size());
+					storedActivity.set(activities.iterator().next());
+					throw new InspectionCompleteException();
+				}));
+		UsageActivity activity = storedActivity.get();
+		assertEquals(ActivityStatus.AWAITING_RETURN_WEIGHT, activity.status());
+		assertEquals(departureGrossWeight, activity.departureGrossWeight().inKilograms());
+		assertTrue(activity.returnGrossWeight().isEmpty());
+		assertTrue(activity.completedAt().isEmpty());
+		assertTrue(activity.consumedQuantity().isEmpty());
+		assertFalse(activity.zeroConsumptionConfirmed());
 	}
 
 	private static Future<Boolean> concurrentStart(
@@ -449,5 +563,23 @@ class UsageActivityUseCasesTest {
 	}
 
 	private static final class InspectionCompleteException extends RuntimeException {
+	}
+
+	private static final class UnreadableClock extends Clock {
+
+		@Override
+		public ZoneId getZone() {
+			return ZoneOffset.UTC;
+		}
+
+		@Override
+		public Clock withZone(ZoneId zone) {
+			return this;
+		}
+
+		@Override
+		public Instant instant() {
+			throw new AssertionError("clock must not be read for a rejected completion");
+		}
 	}
 }

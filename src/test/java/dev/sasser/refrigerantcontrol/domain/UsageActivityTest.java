@@ -10,6 +10,7 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -34,22 +35,52 @@ class UsageActivityTest {
 		UsageActivity activity = startActivity(Weight.of(new BigDecimal("15.14")));
 		Weight returnGrossWeight = Weight.of(new BigDecimal("12.10"));
 
-		activity.complete(returnGrossWeight, COMPLETED_AT);
+		activity.complete(returnGrossWeight, COMPLETED_AT, false);
 
 		assertEquals(ActivityStatus.COMPLETED, activity.status());
 		assertEquals(returnGrossWeight, activity.returnGrossWeight().orElseThrow());
 		assertEquals(COMPLETED_AT, activity.completedAt().orElseThrow());
 		assertEquals(Weight.of(new BigDecimal("3.04")), activity.consumedQuantity().orElseThrow());
+		assertFalse(activity.zeroConsumptionConfirmed());
 	}
 
 	@Test
-	void shouldAllowZeroConsumption() {
+	void shouldNormalizeConfirmationToFalseForNonzeroConsumption() {
+		UsageActivity activity = startActivity(Weight.of(new BigDecimal("15.14")));
+
+		activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT, true);
+
+		assertEquals(ActivityStatus.COMPLETED, activity.status());
+		assertEquals(Weight.of(new BigDecimal("3.04")), activity.consumedQuantity().orElseThrow());
+		assertFalse(activity.zeroConsumptionConfirmed());
+	}
+
+	@Test
+	void shouldRemainPendingWhenZeroConsumptionIsNotConfirmed() {
+		UsageActivity activity = startActivity(Weight.of(new BigDecimal("15.140")));
+
+		assertThrows(
+				IllegalStateException.class,
+				() -> activity.complete(Weight.of(new BigDecimal("15.14")), COMPLETED_AT, false));
+
+		assertPending(activity);
+	}
+
+	@Test
+	void shouldCompleteConfirmedZeroConsumptionAndPreserveScale() {
 		Weight departureGrossWeight = Weight.of(new BigDecimal("15.140"));
 		UsageActivity activity = startActivity(departureGrossWeight);
+		Weight returnGrossWeight = Weight.of(new BigDecimal("15.14"));
 
-		activity.complete(Weight.of(new BigDecimal("15.14")), COMPLETED_AT);
+		activity.complete(returnGrossWeight, COMPLETED_AT, true);
 
-		assertEquals(Weight.of(BigDecimal.ZERO), activity.consumedQuantity().orElseThrow());
+		assertEquals(ActivityStatus.COMPLETED, activity.status());
+		assertEquals(returnGrossWeight, activity.returnGrossWeight().orElseThrow());
+		assertEquals(2, activity.returnGrossWeight().orElseThrow().inKilograms().scale());
+		assertEquals(COMPLETED_AT, activity.completedAt().orElseThrow());
+		assertEquals(new BigDecimal("0.000"), activity.consumedQuantity().orElseThrow().inKilograms());
+		assertEquals(3, activity.consumedQuantity().orElseThrow().inKilograms().scale());
+		assertTrue(activity.zeroConsumptionConfirmed());
 	}
 
 	@Test
@@ -58,7 +89,7 @@ class UsageActivityTest {
 
 		assertThrows(
 				IllegalArgumentException.class,
-				() -> activity.complete(Weight.of(new BigDecimal("15.15")), COMPLETED_AT));
+				() -> activity.complete(Weight.of(new BigDecimal("15.15")), COMPLETED_AT, false));
 		assertPending(activity);
 	}
 
@@ -70,7 +101,8 @@ class UsageActivityTest {
 				IllegalArgumentException.class,
 				() -> activity.complete(
 						Weight.of(new BigDecimal("12.10")),
-						STARTED_AT.minusSeconds(1)));
+						STARTED_AT.minusSeconds(1),
+						false));
 		assertPending(activity);
 	}
 
@@ -78,11 +110,11 @@ class UsageActivityTest {
 	void shouldRemainPendingWhenCompletionArgumentsAreNull() {
 		UsageActivity activity = startActivity(Weight.of(new BigDecimal("15.14")));
 
-		assertThrows(NullPointerException.class, () -> activity.complete(null, COMPLETED_AT));
+		assertThrows(NullPointerException.class, () -> activity.complete(null, COMPLETED_AT, false));
 		assertPending(activity);
 		assertThrows(
 				NullPointerException.class,
-				() -> activity.complete(Weight.of(new BigDecimal("12.10")), null));
+				() -> activity.complete(Weight.of(new BigDecimal("12.10")), null, false));
 		assertPending(activity);
 	}
 
@@ -90,18 +122,20 @@ class UsageActivityTest {
 	void shouldPreserveFirstCompletionWhenCompletedAgain() {
 		UsageActivity activity = startActivity(Weight.of(new BigDecimal("15.14")));
 		Weight firstReturnWeight = Weight.of(new BigDecimal("12.10"));
-		activity.complete(firstReturnWeight, COMPLETED_AT);
+		activity.complete(firstReturnWeight, COMPLETED_AT, false);
 		Weight firstConsumption = activity.consumedQuantity().orElseThrow();
 
 		assertThrows(
 				IllegalStateException.class,
 				() -> activity.complete(
 						Weight.of(new BigDecimal("11.00")),
-						COMPLETED_AT.plusSeconds(60)));
+						COMPLETED_AT.plusSeconds(60),
+						true));
 		assertEquals(ActivityStatus.COMPLETED, activity.status());
 		assertEquals(firstReturnWeight, activity.returnGrossWeight().orElseThrow());
 		assertEquals(COMPLETED_AT, activity.completedAt().orElseThrow());
 		assertEquals(firstConsumption, activity.consumedQuantity().orElseThrow());
+		assertFalse(activity.zeroConsumptionConfirmed());
 		assertEquals(ACTIVITY_LOCATION, activity.activityLocation());
 	}
 
@@ -154,5 +188,6 @@ class UsageActivityTest {
 		assertTrue(activity.returnGrossWeight().isEmpty());
 		assertTrue(activity.completedAt().isEmpty());
 		assertTrue(activity.consumedQuantity().isEmpty());
+		assertFalse(activity.zeroConsumptionConfirmed());
 	}
 }

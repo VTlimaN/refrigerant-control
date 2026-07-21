@@ -106,7 +106,8 @@ public final class InMemoryUsageActivityStore implements UsageActivityStore {
 			Instant startedAt,
 			ActivityStatus status,
 			Optional<BigDecimal> returnGrossWeight,
-			Optional<Instant> completedAt) {
+			Optional<Instant> completedAt,
+			boolean zeroConsumptionConfirmed) {
 
 		private UsageActivitySnapshot {
 			Objects.requireNonNull(sealNumber, "seal number must not be null");
@@ -123,12 +124,18 @@ public final class InMemoryUsageActivityStore implements UsageActivityStore {
 			Objects.requireNonNull(returnGrossWeight, "return gross weight must not be null");
 			Objects.requireNonNull(completedAt, "completed at must not be null");
 			if (status == ActivityStatus.AWAITING_RETURN_WEIGHT
-					&& (returnGrossWeight.isPresent() || completedAt.isPresent())) {
+					&& (returnGrossWeight.isPresent() || completedAt.isPresent() || zeroConsumptionConfirmed)) {
 				throw new IllegalArgumentException("pending activity snapshot must not contain completion values");
 			}
 			if (status == ActivityStatus.COMPLETED
 					&& (returnGrossWeight.isEmpty() || completedAt.isEmpty())) {
 				throw new IllegalArgumentException("completed activity snapshot must contain completion values");
+			}
+			if (status == ActivityStatus.COMPLETED) {
+				boolean zeroConsumption = departureGrossWeight.compareTo(returnGrossWeight.orElseThrow()) == 0;
+				if (zeroConsumption != zeroConsumptionConfirmed) {
+					throw new IllegalArgumentException("completion confirmation must match zero consumption");
+				}
 			}
 		}
 
@@ -144,7 +151,8 @@ public final class InMemoryUsageActivityStore implements UsageActivityStore {
 					activity.startedAt(),
 					activity.status(),
 					activity.returnGrossWeight().map(Weight::inKilograms),
-					activity.completedAt());
+					activity.completedAt(),
+					activity.zeroConsumptionConfirmed());
 		}
 
 		private UsageActivity toActivity() {
@@ -159,7 +167,10 @@ public final class InMemoryUsageActivityStore implements UsageActivityStore {
 					startedAt,
 					List.of());
 			if (status == ActivityStatus.COMPLETED) {
-				activity.complete(Weight.of(returnGrossWeight.orElseThrow()), completedAt.orElseThrow());
+				activity.complete(
+						Weight.of(returnGrossWeight.orElseThrow()),
+						completedAt.orElseThrow(),
+						zeroConsumptionConfirmed);
 			}
 			return activity;
 		}

@@ -17,7 +17,8 @@ public record UsageActivityResult(
 		ActivityStatus status,
 		Optional<BigDecimal> returnGrossWeight,
 		Optional<Instant> completedAt,
-		Optional<BigDecimal> consumedQuantity) {
+		Optional<BigDecimal> consumedQuantity,
+		boolean zeroConsumptionConfirmed) {
 
 	public UsageActivityResult {
 		Objects.requireNonNull(sealNumber, "seal number must not be null");
@@ -30,6 +31,16 @@ public record UsageActivityResult(
 		Objects.requireNonNull(returnGrossWeight, "return gross weight must not be null");
 		Objects.requireNonNull(completedAt, "completed at must not be null");
 		Objects.requireNonNull(consumedQuantity, "consumed quantity must not be null");
+		boolean hasZeroConsumption = consumedQuantity
+				.filter(consumption -> consumption.signum() == 0)
+				.isPresent();
+		if (zeroConsumptionConfirmed
+				&& (status != ActivityStatus.COMPLETED || !hasZeroConsumption)) {
+			throw new IllegalArgumentException("zero consumption confirmation requires completed zero consumption");
+		}
+		if (status == ActivityStatus.COMPLETED && hasZeroConsumption && !zeroConsumptionConfirmed) {
+			throw new IllegalArgumentException("completed zero consumption must be confirmed");
+		}
 	}
 
 	static UsageActivityResult from(UsageActivity activity) {
@@ -42,6 +53,7 @@ public record UsageActivityResult(
 				requiredActivity.status(),
 				requiredActivity.returnGrossWeight().map(Weight::inKilograms),
 				requiredActivity.completedAt(),
-				requiredActivity.consumedQuantity().map(Weight::inKilograms));
+				requiredActivity.consumedQuantity().map(Weight::inKilograms),
+				requiredActivity.zeroConsumptionConfirmed());
 	}
 }

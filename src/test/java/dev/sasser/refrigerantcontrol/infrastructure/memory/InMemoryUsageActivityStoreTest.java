@@ -25,6 +25,7 @@ import dev.sasser.refrigerantcontrol.domain.UsageActivityStarter;
 import dev.sasser.refrigerantcontrol.domain.Weight;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -62,11 +63,11 @@ class InMemoryUsageActivityStoreTest {
 		assertEquals(1, calls.get());
 		assertNotSame(callbackActivity.get(), returned);
 		assertEquals(ACTIVITY_LOCATION, returned.activityLocation());
-		returned.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT);
+		returned.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT, false);
 		AtomicReference<ActivityStatus> storedStatus = new AtomicReference<>();
 		store.completePendingAtomically(FIRST_SEAL, activity -> {
 			storedStatus.set(activity.status());
-			activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT);
+			activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT, false);
 		});
 		assertEquals(ActivityStatus.AWAITING_RETURN_WEIGHT, storedStatus.get());
 	}
@@ -77,7 +78,7 @@ class InMemoryUsageActivityStoreTest {
 		start(store, FIRST_SEAL, STARTED_AT);
 		store.completePendingAtomically(
 				FIRST_SEAL,
-				activity -> activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT));
+				activity -> activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT, false));
 
 		UsageActivity second = store.startAtomically(FIRST_SEAL, activities -> {
 			assertEquals(1, activities.size());
@@ -123,14 +124,14 @@ class InMemoryUsageActivityStoreTest {
 				activities -> {
 					UsageActivity detachedHistory = activities.iterator().next();
 					assertNotSame(returned, detachedHistory);
-					detachedHistory.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT);
+					detachedHistory.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT, false);
 					throw failure;
 				}));
 
 		assertSame(failure, thrown);
 		assertTrue(store.completePendingAtomically(
 				FIRST_SEAL,
-				activity -> activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT))
+				activity -> activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT, false))
 				.isPresent());
 	}
 
@@ -140,13 +141,14 @@ class InMemoryUsageActivityStoreTest {
 		start(store, FIRST_SEAL, STARTED_AT);
 		store.completePendingAtomically(
 				FIRST_SEAL,
-				activity -> activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT));
+				activity -> activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT, false));
 		start(store, FIRST_SEAL, COMPLETED_AT.plusSeconds(60));
 		store.completePendingAtomically(
 				FIRST_SEAL,
 				activity -> activity.complete(
 						Weight.of(new BigDecimal("11.00")),
-						COMPLETED_AT.plusSeconds(120)));
+						COMPLETED_AT.plusSeconds(120),
+						false));
 
 		UsageActivity third = store.startAtomically(FIRST_SEAL, activities -> {
 			assertEquals(2, activities.size());
@@ -222,7 +224,7 @@ class InMemoryUsageActivityStoreTest {
 				FIRST_SEAL,
 				activity -> {
 					calls.incrementAndGet();
-					activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT);
+					activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT, false);
 					throw failure;
 				}));
 
@@ -230,9 +232,63 @@ class InMemoryUsageActivityStoreTest {
 		assertEquals(1, calls.get());
 		UsageActivity completed = store.completePendingAtomically(
 				FIRST_SEAL,
-				activity -> activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT))
+				activity -> {
+					assertEquals(ActivityStatus.AWAITING_RETURN_WEIGHT, activity.status());
+					assertEquals(FIRST_SEAL, activity.cylinder().sealNumber());
+					assertEquals(DEPARTURE_WEIGHT.inKilograms(), activity.departureGrossWeight().inKilograms());
+					assertEquals(ACTIVITY_LOCATION, activity.activityLocation());
+					assertEquals(STARTED_AT, activity.startedAt());
+					assertTrue(activity.returnGrossWeight().isEmpty());
+					assertTrue(activity.completedAt().isEmpty());
+					assertTrue(activity.consumedQuantity().isEmpty());
+					assertFalse(activity.zeroConsumptionConfirmed());
+					activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT, false);
+				})
 				.orElseThrow();
 		assertEquals(ActivityStatus.COMPLETED, completed.status());
+		assertFalse(completed.zeroConsumptionConfirmed());
+	}
+
+	@Test
+	void shouldPreservePendingSnapshotAfterUnconfirmedZeroAndReconstructConfirmedZero() {
+		InMemoryUsageActivityStore store = new InMemoryUsageActivityStore();
+		start(store, FIRST_SEAL, STARTED_AT);
+		Weight numericallyEqualReturn = Weight.of(new BigDecimal("15.140"));
+
+		assertThrows(
+				IllegalStateException.class,
+				() -> store.completePendingAtomically(
+						FIRST_SEAL,
+						activity -> activity.complete(numericallyEqualReturn, COMPLETED_AT, false)));
+
+		UsageActivity completed = store.completePendingAtomically(
+				FIRST_SEAL,
+				activity -> {
+					assertEquals(ActivityStatus.AWAITING_RETURN_WEIGHT, activity.status());
+					assertEquals(DEPARTURE_WEIGHT.inKilograms(), activity.departureGrossWeight().inKilograms());
+					assertTrue(activity.returnGrossWeight().isEmpty());
+					assertTrue(activity.completedAt().isEmpty());
+					assertTrue(activity.consumedQuantity().isEmpty());
+					assertFalse(activity.zeroConsumptionConfirmed());
+					activity.complete(numericallyEqualReturn, COMPLETED_AT, true);
+				})
+				.orElseThrow();
+
+		assertEquals(ActivityStatus.COMPLETED, completed.status());
+		assertEquals(FIRST_SEAL, completed.cylinder().sealNumber());
+		assertEquals("R410A", completed.cylinder().refrigerantGas().operationalName());
+		assertEquals(ACTIVITY_LOCATION, completed.activityLocation());
+		assertEquals(new BigDecimal("15.14"), completed.departureGrossWeight().inKilograms());
+		assertEquals(2, completed.departureGrossWeight().inKilograms().scale());
+		assertEquals(numericallyEqualReturn, completed.returnGrossWeight().orElseThrow());
+		assertEquals(new BigDecimal("15.140"), completed.returnGrossWeight().orElseThrow().inKilograms());
+		assertEquals(3, completed.returnGrossWeight().orElseThrow().inKilograms().scale());
+		assertEquals(COMPLETED_AT, completed.completedAt().orElseThrow());
+		assertEquals(new BigDecimal("0.000"), completed.consumedQuantity().orElseThrow().inKilograms());
+		assertEquals(3, completed.consumedQuantity().orElseThrow().inKilograms().scale());
+		assertTrue(completed.zeroConsumptionConfirmed());
+		assertTrue(store.completePendingAtomically(FIRST_SEAL, activity -> {
+		}).isEmpty());
 	}
 
 	@Test
@@ -243,12 +299,13 @@ class InMemoryUsageActivityStoreTest {
 
 		UsageActivity returned = store.completePendingAtomically(FIRST_SEAL, activity -> {
 			callbackActivity.set(activity);
-			activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT);
+			activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT, false);
 		}).orElseThrow();
 
 		assertNotSame(callbackActivity.get(), returned);
 		assertEquals(ActivityStatus.COMPLETED, returned.status());
 		assertEquals(ACTIVITY_LOCATION, returned.activityLocation());
+		assertFalse(returned.zeroConsumptionConfirmed());
 		assertTrue(store.completePendingAtomically(FIRST_SEAL, activity -> {
 		}).isEmpty());
 		RuntimeException inspected = new RuntimeException("completed history inspected");
@@ -258,6 +315,7 @@ class InMemoryUsageActivityStoreTest {
 					UsageActivity storedHistory = activities.iterator().next();
 					assertNotSame(returned, storedHistory);
 					assertEquals(ActivityStatus.COMPLETED, storedHistory.status());
+					assertFalse(storedHistory.zeroConsumptionConfirmed());
 					throw inspected;
 				}));
 		assertSame(inspected, thrown);
@@ -362,7 +420,7 @@ class InMemoryUsageActivityStoreTest {
 		}).isEmpty());
 		assertTrue(firstStore.completePendingAtomically(
 				FIRST_SEAL,
-				activity -> activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT))
+				activity -> activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT, false))
 				.isPresent());
 	}
 

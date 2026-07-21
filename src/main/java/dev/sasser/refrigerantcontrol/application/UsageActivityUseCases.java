@@ -60,15 +60,33 @@ public final class UsageActivityUseCases {
 		return UsageActivityResult.from(activity);
 	}
 
-	public UsageActivityResult completePendingUsageActivity(String sealNumber, BigDecimal returnGrossWeight) {
+	public UsageActivityResult completePendingUsageActivity(
+			String sealNumber,
+			BigDecimal returnGrossWeight,
+			boolean zeroConsumptionConfirmed) {
 		SealNumber seal = SealNumber.of(sealNumber);
-		Weight returnWeight = Weight.of(returnGrossWeight);
+		Weight returnWeight;
+		try {
+			returnWeight = Weight.of(returnGrossWeight);
+		}
+		catch (IllegalArgumentException exception) {
+			throw new NegativeReturnGrossWeightException(seal);
+		}
 		cylinderStore.findBySealNumber(seal)
 				.orElseThrow(() -> new CylinderNotFoundException(seal));
 
 		UsageActivity completedActivity = usageActivityStore.completePendingAtomically(
 				seal,
-				activity -> activity.complete(returnWeight, clock.instant()))
+				activity -> {
+					int weightComparison = returnWeight.compareTo(activity.departureGrossWeight());
+					if (weightComparison > 0) {
+						throw new ReturnGrossWeightGreaterThanDepartureException(seal);
+					}
+					if (weightComparison == 0 && !zeroConsumptionConfirmed) {
+						throw new ZeroConsumptionConfirmationRequiredException(seal);
+					}
+					activity.complete(returnWeight, clock.instant(), zeroConsumptionConfirmed);
+				})
 				.orElseThrow(() -> new PendingUsageActivityNotFoundException(seal));
 
 		return UsageActivityResult.from(completedActivity);
