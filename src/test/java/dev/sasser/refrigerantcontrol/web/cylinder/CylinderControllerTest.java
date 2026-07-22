@@ -65,6 +65,8 @@ class CylinderControllerTest {
 				.andExpect(content().string(containsString("href=\"/\"")))
 				.andExpect(content().string(containsString("href=\"/activities/start\"")))
 				.andExpect(content().string(containsString("Iniciar atividade")))
+				.andExpect(content().string(containsString("href=\"/activities/return\"")))
+				.andExpect(content().string(containsString("Registrar retorno")))
 				.andExpect(content().string(containsString("for=\"cylinder-seal-number\">Número do lacre")))
 				.andExpect(content().string(containsString("for=\"operational-refrigerant-name\">Gás refrigerante")))
 				.andExpect(content().string(containsString("for=\"initial-gross-weight\">Peso bruto inicial")))
@@ -75,7 +77,8 @@ class CylinderControllerTest {
 						"Os dados cadastrados nesta etapa ficam apenas na memória e serão perdidos quando a aplicação for reiniciada.")))
 				.andExpect(content().string(not(containsString("name=\"departureGrossWeight\""))))
 				.andExpect(content().string(not(containsString("name=\"returnGrossWeight\""))))
-				.andExpect(content().string(not(containsString("action=\"/activities/start\""))));
+				.andExpect(content().string(not(containsString("action=\"/activities/start\""))))
+				.andExpect(content().string(not(containsString("action=\"/activities/return\""))));
 	}
 
 	@Test
