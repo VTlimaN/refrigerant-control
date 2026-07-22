@@ -1,11 +1,17 @@
 package dev.sasser.refrigerantcontrol.infrastructure.memory;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,6 +47,136 @@ class InMemoryUsageActivityStoreTest {
 	private static final Weight DEPARTURE_WEIGHT = Weight.of(new BigDecimal("15.14"));
 	private static final String ACTIVITY_LOCATION = "  Technical room — Área A  ";
 	private static final UsageActivityStarter STARTER = new UsageActivityStarter();
+
+	@Test
+	void shouldReturnEmptyUnmodifiablePendingActivityCollection() {
+		Collection<UsageActivity> activities = new InMemoryUsageActivityStore()
+				.findPendingUsageActivities();
+
+		assertTrue(activities.isEmpty());
+		assertThrows(UnsupportedOperationException.class, activities::clear);
+	}
+
+	@Test
+	void shouldReturnAllPendingActivitiesWithExactValuesWithoutDependingOnOrder() {
+		InMemoryUsageActivityStore store = new InMemoryUsageActivityStore();
+		Weight firstWeight = Weight.of(new BigDecimal("15.140"));
+		Weight secondWeight = Weight.of(new BigDecimal("14.00"));
+		String firstLocation = "  Oficina técnica — Área 7!  ";
+		String secondLocation = "Casa de máquinas B";
+		Instant secondStartedAt = STARTED_AT.plusSeconds(60);
+		start(store, FIRST_SEAL, firstWeight, firstLocation, STARTED_AT);
+		start(store, SECOND_SEAL, secondWeight, secondLocation, secondStartedAt);
+
+		Collection<UsageActivity> activities = store.findPendingUsageActivities();
+
+		assertEquals(2, activities.size());
+		assertEquals(Set.of(FIRST_SEAL, SECOND_SEAL), sealNumbers(activities));
+		assertPendingActivity(
+				activityForSeal(activities, FIRST_SEAL),
+				FIRST_SEAL,
+				firstWeight,
+				firstLocation,
+				STARTED_AT);
+		assertPendingActivity(
+				activityForSeal(activities, SECOND_SEAL),
+				SECOND_SEAL,
+				secondWeight,
+				secondLocation,
+				secondStartedAt);
+	}
+
+	@Test
+	void shouldExcludeCompletedActivitiesAndReturnFreshDetachedPendingActivities() {
+		InMemoryUsageActivityStore store = new InMemoryUsageActivityStore();
+		start(store, FIRST_SEAL, STARTED_AT);
+		start(store, SECOND_SEAL, STARTED_AT.plusSeconds(60));
+		store.completePendingAtomically(
+				FIRST_SEAL,
+				activity -> activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT, false));
+
+		Collection<UsageActivity> firstQuery = store.findPendingUsageActivities();
+		Collection<UsageActivity> secondQuery = store.findPendingUsageActivities();
+		UsageActivity detachedActivity = activityForSeal(firstQuery, SECOND_SEAL);
+		UsageActivity separatelyReconstructedActivity = activityForSeal(secondQuery, SECOND_SEAL);
+
+		assertEquals(Set.of(SECOND_SEAL), sealNumbers(firstQuery));
+		assertEquals(Set.of(SECOND_SEAL), sealNumbers(secondQuery));
+		assertNotSame(detachedActivity, separatelyReconstructedActivity);
+		detachedActivity.complete(
+				Weight.of(new BigDecimal("12.10")),
+				COMPLETED_AT.plusSeconds(60),
+				false);
+
+		Collection<UsageActivity> thirdQuery = store.findPendingUsageActivities();
+		UsageActivity storedActivity = activityForSeal(thirdQuery, SECOND_SEAL);
+		assertNotSame(detachedActivity, storedActivity);
+		assertNotSame(separatelyReconstructedActivity, storedActivity);
+		assertPendingActivity(
+				storedActivity,
+				SECOND_SEAL,
+				DEPARTURE_WEIGHT,
+				ACTIVITY_LOCATION,
+				STARTED_AT.plusSeconds(60));
+	}
+
+	@Test
+	void shouldObserveCoherentSnapshotDuringConcurrentCompletion() {
+		assertTimeoutPreemptively(Duration.ofSeconds(15), () -> {
+			InMemoryUsageActivityStore store = new InMemoryUsageActivityStore();
+			start(store, FIRST_SEAL, STARTED_AT);
+			ExecutorService executor = Executors.newFixedThreadPool(2);
+			CountDownLatch completionEntered = new CountDownLatch(1);
+			CountDownLatch releaseCompletion = new CountDownLatch(1);
+			CountDownLatch queryStarted = new CountDownLatch(1);
+			AtomicReference<Thread> completionThread = new AtomicReference<>();
+			AtomicReference<Thread> queryThread = new AtomicReference<>();
+			try {
+				Future<Optional<UsageActivity>> completion = executor.submit(() -> store.completePendingAtomically(
+						FIRST_SEAL,
+						activity -> {
+							activity.complete(
+									Weight.of(new BigDecimal("12.10")),
+									COMPLETED_AT,
+									false);
+							completionThread.set(Thread.currentThread());
+							completionEntered.countDown();
+							try {
+								if (!releaseCompletion.await(5, TimeUnit.SECONDS)) {
+									throw new IllegalStateException("completion was not released");
+								}
+							}
+							catch (InterruptedException exception) {
+								Thread.currentThread().interrupt();
+								throw new IllegalStateException("completion was interrupted", exception);
+							}
+						}));
+				awaitWorkerSignal(completionEntered, completion, "completion callback was not entered");
+
+				Future<Collection<UsageActivity>> query = executor.submit(() -> {
+					queryThread.set(Thread.currentThread());
+					queryStarted.countDown();
+					return store.findPendingUsageActivities();
+				});
+				awaitWorkerSignal(queryStarted, query, "query worker did not start");
+				ThreadInfo blockedQuery = awaitBlockedQuery(
+						query,
+						queryThread.get(),
+						completionThread.get());
+				assertEquals(Thread.State.BLOCKED, blockedQuery.getThreadState());
+				assertEquals(completionThread.get().threadId(), blockedQuery.getLockOwnerId());
+
+				releaseCompletion.countDown();
+				assertTrue(completion.get(5, TimeUnit.SECONDS).isPresent());
+				assertTrue(query.get(5, TimeUnit.SECONDS).isEmpty());
+			}
+			finally {
+				releaseCompletion.countDown();
+				executor.shutdownNow();
+				assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+			}
+		});
+	}
 
 	@Test
 	void shouldInvokeStartOnceAndReturnFreshDetachedActivity() {
@@ -179,13 +315,7 @@ class InMemoryUsageActivityStoreTest {
 
 		assertSame(failure, thrown);
 		assertEquals(1, calls.get());
-		AtomicReference<Integer> relevantCount = new AtomicReference<>();
-		RuntimeException inspected = new RuntimeException("inspected");
-		assertThrows(RuntimeException.class, () -> store.startAtomically(FIRST_SEAL, activities -> {
-			relevantCount.set(activities.size());
-			throw inspected;
-		}));
-		assertEquals(0, relevantCount.get());
+		assertTrue(store.findPendingUsageActivities().isEmpty());
 	}
 
 	@Test
@@ -204,13 +334,7 @@ class InMemoryUsageActivityStoreTest {
 								STARTED_AT,
 								activities)));
 
-		AtomicReference<Integer> relevantCount = new AtomicReference<>();
-		RuntimeException inspected = new RuntimeException("inspected");
-		assertThrows(RuntimeException.class, () -> store.startAtomically(FIRST_SEAL, activities -> {
-			relevantCount.set(activities.size());
-			throw inspected;
-		}));
-		assertEquals(0, relevantCount.get());
+		assertTrue(store.findPendingUsageActivities().isEmpty());
 	}
 
 	@Test
@@ -395,13 +519,7 @@ class InMemoryUsageActivityStoreTest {
 					}
 				}
 				assertEquals(1, successes);
-				AtomicReference<Integer> historySize = new AtomicReference<>();
-				RuntimeException inspected = new RuntimeException("inspected");
-				assertThrows(RuntimeException.class, () -> store.startAtomically(FIRST_SEAL, activities -> {
-					historySize.set(activities.size());
-					throw inspected;
-				}));
-				assertEquals(1, historySize.get());
+				assertEquals(1, store.findPendingUsageActivities().size());
 			} finally {
 				start.countDown();
 				executor.shutdownNow();
@@ -416,26 +534,139 @@ class InMemoryUsageActivityStoreTest {
 		InMemoryUsageActivityStore secondStore = new InMemoryUsageActivityStore();
 		start(firstStore, FIRST_SEAL, STARTED_AT);
 
+		assertEquals(Set.of(FIRST_SEAL), sealNumbers(firstStore.findPendingUsageActivities()));
+		assertTrue(secondStore.findPendingUsageActivities().isEmpty());
 		assertTrue(secondStore.completePendingAtomically(FIRST_SEAL, activity -> {
 		}).isEmpty());
 		assertTrue(firstStore.completePendingAtomically(
 				FIRST_SEAL,
 				activity -> activity.complete(Weight.of(new BigDecimal("12.10")), COMPLETED_AT, false))
 				.isPresent());
+		assertTrue(firstStore.findPendingUsageActivities().isEmpty());
+		assertTrue(secondStore.findPendingUsageActivities().isEmpty());
+	}
+
+	private static ThreadInfo awaitBlockedQuery(
+			Future<?> query,
+			Thread queryThread,
+			Thread completionThread) throws Exception {
+		Thread requiredQueryThread = Objects.requireNonNull(queryThread, "query thread must be captured");
+		Thread requiredCompletionThread = Objects.requireNonNull(
+				completionThread,
+				"completion thread must be captured");
+		ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
+		long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+		ThreadInfo queryInfo = null;
+		do {
+			if (query.isDone()) {
+				query.get();
+				throw new AssertionError("query completed before blocking on the adapter monitor");
+			}
+			queryInfo = threadMXBean.getThreadInfo(requiredQueryThread.threadId());
+			if (queryInfo != null
+					&& queryInfo.getThreadState() == Thread.State.BLOCKED
+					&& queryInfo.getLockOwnerId() == requiredCompletionThread.threadId()) {
+				return queryInfo;
+			}
+			Thread.onSpinWait();
+		}
+		while (System.nanoTime() < deadline);
+
+		if (query.isDone()) {
+			query.get();
+			throw new AssertionError("query completed without blocking on the adapter monitor");
+		}
+		String observedState = queryInfo == null ? "unavailable" : queryInfo.getThreadState().name();
+		long observedLockOwnerId = queryInfo == null ? -1 : queryInfo.getLockOwnerId();
+		throw new AssertionError(
+				"query did not block on the completion worker; state="
+						+ observedState
+						+ ", lockOwnerId="
+						+ observedLockOwnerId);
+	}
+
+	private static void awaitWorkerSignal(
+			CountDownLatch signal,
+			Future<?> worker,
+			String timeoutMessage) throws Exception {
+		long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+		do {
+			if (signal.getCount() == 0) {
+				return;
+			}
+			if (worker.isDone()) {
+				worker.get();
+				throw new AssertionError(timeoutMessage + "; worker completed before signaling");
+			}
+			signal.await(10, TimeUnit.MILLISECONDS);
+		}
+		while (System.nanoTime() < deadline);
+
+		if (worker.isDone()) {
+			worker.get();
+		}
+		throw new AssertionError(timeoutMessage);
 	}
 
 	private static UsageActivity start(
 			InMemoryUsageActivityStore store,
 			SealNumber sealNumber,
 			Instant startedAt) {
+		return start(store, sealNumber, DEPARTURE_WEIGHT, ACTIVITY_LOCATION, startedAt);
+	}
+
+	private static UsageActivity start(
+			InMemoryUsageActivityStore store,
+			SealNumber sealNumber,
+			Weight departureGrossWeight,
+			String activityLocation,
+			Instant startedAt) {
 		return store.startAtomically(
 				sealNumber,
 				activities -> STARTER.start(
 						readyCylinder(sealNumber.value()),
-						DEPARTURE_WEIGHT,
-						ACTIVITY_LOCATION,
+						departureGrossWeight,
+						activityLocation,
 						startedAt,
 						activities));
+	}
+
+	private static Set<SealNumber> sealNumbers(Collection<UsageActivity> activities) {
+		Set<SealNumber> sealNumbers = new HashSet<>();
+		for (UsageActivity activity : activities) {
+			sealNumbers.add(activity.cylinder().sealNumber());
+		}
+		return sealNumbers;
+	}
+
+	private static UsageActivity activityForSeal(
+			Collection<UsageActivity> activities,
+			SealNumber sealNumber) {
+		List<UsageActivity> matchingActivities = activities.stream()
+				.filter(activity -> activity.cylinder().sealNumber().equals(sealNumber))
+				.toList();
+		assertEquals(1, matchingActivities.size());
+		return matchingActivities.getFirst();
+	}
+
+	private static void assertPendingActivity(
+			UsageActivity activity,
+			SealNumber sealNumber,
+			Weight departureGrossWeight,
+			String activityLocation,
+			Instant startedAt) {
+		assertEquals(sealNumber, activity.cylinder().sealNumber());
+		assertEquals(departureGrossWeight.inKilograms(), activity.departureGrossWeight().inKilograms());
+		assertEquals(
+				departureGrossWeight.inKilograms().scale(),
+				activity.departureGrossWeight().inKilograms().scale());
+		assertEquals(activityLocation, activity.activityLocation());
+		assertEquals(startedAt, activity.startedAt());
+		assertEquals(ActivityStatus.AWAITING_RETURN_WEIGHT, activity.status());
+		assertTrue(activity.returnGrossWeight().isEmpty());
+		assertTrue(activity.completedAt().isEmpty());
+		assertTrue(activity.consumedQuantity().isEmpty());
+		assertFalse(activity.zeroConsumptionConfirmed());
 	}
 
 	private static Cylinder readyCylinder(String sealNumber) {

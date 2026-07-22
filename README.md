@@ -38,7 +38,7 @@ O Milestone 2B.2 adiciona uma camada de aplicação também escrita em Java puro
 
 As entradas da aplicação usam `String` e `BigDecimal`. As saídas são registros imutáveis, `CylinderResult` e `UsageActivityResult`, que não expõem as entidades mutáveis do domínio. Os instantes de início e conclusão são obtidos de um `Clock` fornecido ao caso de uso e continuam sendo passados explicitamente ao domínio.
 
-As interfaces `CylinderStore` e `UsageActivityStore` definem operações específicas para cadastro único, atualização do cilindro, início atômico e conclusão da atividade pendente. Os adaptadores `InMemoryCylinderStore` e `InMemoryUsageActivityStore` permitem executar e testar essas operações sem Spring e sem banco de dados. Eles guardam snapshots imutáveis, devolvem reconstruções independentes e preservam o histórico de atividades concluídas usado na validação de um novo início.
+As interfaces `CylinderStore` e `UsageActivityStore` definem operações específicas para cadastro único, atualização do cilindro, início atômico, conclusão da atividade pendente e consulta somente de leitura das atividades que aguardam retorno. Os adaptadores `InMemoryCylinderStore` e `InMemoryUsageActivityStore` permitem executar e testar essas operações sem Spring e sem banco de dados. Eles guardam snapshots imutáveis, devolvem reconstruções independentes e preservam o histórico de atividades concluídas usado na validação de um novo início.
 
 Esses adaptadores são temporários, não duráveis e locais ao processo. A atomicidade e a unicidade valem somente para chamadas que compartilham a mesma instância do adaptador na mesma JVM. Não há garantia distribuída nem transação de banco de dados.
 
@@ -98,7 +98,13 @@ Quando os pesos de saída e retorno são numericamente iguais, a primeira tentat
 
 Depois de uma conclusão bem-sucedida, POST/Redirect/GET retorna à rota fixa e apresenta uma única vez o lacre, o local, os pesos brutos, o consumo e a situação em texto operacional. Uma atualização não repete a conclusão, e um novo envio para a mesma atividade informa que não existe atividade aguardando retorno. Os números são exibidos com vírgula e mantêm os zeros finais armazenados.
 
-O armazenamento continua somente na memória da JVM e todos os dados são perdidos após reiniciar a aplicação ou seu contexto. Ainda não há histórico ou listagem, persistência, autenticação, correção, cancelamento ou reabertura de atividades.
+O armazenamento continua somente na memória da JVM e todos os dados são perdidos após reiniciar a aplicação ou seu contexto. Ainda não há interface web de histórico ou de listagem, persistência, autenticação, correção, cancelamento ou reabertura de atividades.
+
+## Milestone 2C.5A — Contrato de consulta de atividades pendentes
+
+`UsageActivityUseCases` agora oferece uma consulta sem entrada que devolve todas as atividades em `AWAITING_RETURN_WEIGHT` e exclui as concluídas. O `UsageActivityStore` entrega uma coleção estruturalmente imutável de atividades reconstruídas e desvinculadas do estado armazenado, e a aplicação converte cada uma em um `UsageActivityResult` imutável sem acessar o `Clock` ou alterar dados.
+
+O adaptador em memória observa um único snapshot coerente sob seu bloqueio existente. A ordem de iteração não é garantida. Esta etapa não adiciona rota, página, filtro, paginação, histórico ou persistência.
 
 ## Tecnologias
 
@@ -331,7 +337,7 @@ No estado atual do projeto ainda não existem:
 - garantia de unicidade global dos lacres entre processos ou instâncias diferentes dos adaptadores em memória;
 - dashboard;
 - cadastro editável de gases ou lista de cilindros;
-- histórico ou listagem de atividades;
+- interface web de histórico ou de listagem de atividades;
 - conversão de datas para apresentação em `America/Sao_Paulo`;
 - ciclo de cilindro vazio, correção, cancelamento ou importação;
 - identificação persistente de atividades, relatórios, backup ou exportação;
@@ -356,3 +362,5 @@ O Milestone 2C.3B demonstra como iniciar uma atividade por uma página server-re
 O Milestone 2C.4A demonstra como uma confirmação operacional obrigatória atravessa agregado, caso de uso, resultado imutável e snapshot sem criar uma interface prematuramente. A conclusão continua atômica, falhas tipadas distinguem pesos negativos, retorno maior que saída e consumo zero não confirmado, e o `Clock` permanece a única origem de `completedAt`.
 
 O Milestone 2C.4B conecta esse contrato a uma página server-rendered com somente lacre e peso bruto de retorno. A confirmação de consumo zero aparece apenas quando necessária, o resultado usa POST/Redirect/GET, os valores decimais mantêm sua escala na apresentação e o controller permanece restrito a responsabilidades HTTP.
+
+O Milestone 2C.5A demonstra como uma consulta de aplicação pode expor resultados imutáveis sem vazar agregados armazenados. O adaptador reconstrói atividades pendentes desvinculadas em um snapshot coerente, exclui as concluídas e mantém a ordem de iteração fora do contrato, sem antecipar uma interface web ou persistência.

@@ -27,6 +27,20 @@ public final class InMemoryUsageActivityStore implements UsageActivityStore {
 	private final Map<String, List<UsageActivitySnapshot>> activitiesBySealNumber = new HashMap<>();
 
 	@Override
+	public Collection<UsageActivity> findPendingUsageActivities() {
+		synchronized (lock) {
+			List<UsageActivity> pendingActivities = new ArrayList<>();
+			for (List<UsageActivitySnapshot> snapshots : activitiesBySealNumber.values()) {
+				int pendingIndex = findPendingIndex(snapshots);
+				if (pendingIndex >= 0) {
+					pendingActivities.add(snapshots.get(pendingIndex).toActivity());
+				}
+			}
+			return List.copyOf(pendingActivities);
+		}
+	}
+
+	@Override
 	public UsageActivity startAtomically(
 			SealNumber sealNumber,
 			Function<Collection<UsageActivity>, UsageActivity> startOperation) {

@@ -7,14 +7,16 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -48,6 +50,91 @@ class UsageActivityUseCasesTest {
 	private final InMemoryCylinderStore cylinderStore = new InMemoryCylinderStore();
 	private final InMemoryUsageActivityStore activityStore = new InMemoryUsageActivityStore();
 	private final CylinderUseCases cylinderUseCases = new CylinderUseCases(cylinderStore);
+
+	@Test
+	void shouldReturnEmptyImmutablePendingActivityResultsWithoutReadingClock() {
+		Collection<UsageActivityResult> results = usageUseCasesWithClock(new UnreadableClock())
+				.listPendingUsageActivities();
+
+		assertTrue(results.isEmpty());
+		assertThrows(UnsupportedOperationException.class, results::clear);
+	}
+
+	@Test
+	void shouldReturnAllPendingActivitiesWithExactValuesWithoutDependingOnOrder() {
+		String firstLocation = "  Oficina técnica — Área 7!  ";
+		String secondLocation = "Casa de máquinas B";
+		Instant secondStartedAt = STARTED_AT.plusSeconds(60);
+		registerReadyCylinder(FIRST_SEAL);
+		registerReadyCylinder(SECOND_SEAL);
+		usageUseCasesAt(STARTED_AT).startUsageActivity(
+				FIRST_SEAL,
+				new BigDecimal("15.140"),
+				firstLocation);
+		usageUseCasesAt(secondStartedAt).startUsageActivity(
+				SECOND_SEAL,
+				new BigDecimal("14.00"),
+				secondLocation);
+
+		Collection<UsageActivityResult> results = usageUseCasesWithClock(new UnreadableClock())
+				.listPendingUsageActivities();
+
+		assertEquals(2, results.size());
+		assertEquals(Set.of(FIRST_SEAL, SECOND_SEAL), sealNumbers(results));
+		assertPendingResult(
+				resultForSeal(results, FIRST_SEAL),
+				FIRST_SEAL,
+				new BigDecimal("15.140"),
+				firstLocation,
+				STARTED_AT);
+		assertPendingResult(
+				resultForSeal(results, SECOND_SEAL),
+				SECOND_SEAL,
+				new BigDecimal("14.00"),
+				secondLocation,
+				secondStartedAt);
+	}
+
+	@Test
+	void shouldExcludeCompletedActivitiesAndPreserveStateAcrossRepeatedQueries() {
+		Instant secondStartedAt = STARTED_AT.plusSeconds(60);
+		registerReadyCylinder(FIRST_SEAL);
+		registerReadyCylinder(SECOND_SEAL);
+		usageUseCasesAt(STARTED_AT).startUsageActivity(
+				FIRST_SEAL,
+				new BigDecimal("15.140"),
+				ACTIVITY_LOCATION);
+		usageUseCasesAt(secondStartedAt).startUsageActivity(
+				SECOND_SEAL,
+				new BigDecimal("14.00"),
+				"Second location");
+		usageUseCasesAt(COMPLETED_AT).completePendingUsageActivity(
+				FIRST_SEAL,
+				new BigDecimal("12.100"),
+				false);
+		UsageActivityUseCases queryUseCases = usageUseCasesWithClock(new UnreadableClock());
+
+		Collection<UsageActivityResult> firstQuery = queryUseCases.listPendingUsageActivities();
+		Collection<UsageActivityResult> secondQuery = queryUseCases.listPendingUsageActivities();
+
+		assertEquals(Set.of(SECOND_SEAL), sealNumbers(firstQuery));
+		assertEquals(Set.of(SECOND_SEAL), sealNumbers(secondQuery));
+		assertPendingResult(
+				resultForSeal(firstQuery, SECOND_SEAL),
+				SECOND_SEAL,
+				new BigDecimal("14.00"),
+				"Second location",
+				secondStartedAt);
+		assertPendingResult(
+				resultForSeal(secondQuery, SECOND_SEAL),
+				SECOND_SEAL,
+				new BigDecimal("14.00"),
+				"Second location",
+				secondStartedAt);
+		UsageActivityResult completed = usageUseCasesAt(COMPLETED_AT.plusSeconds(60))
+				.completePendingUsageActivity(SECOND_SEAL, new BigDecimal("12.00"), false);
+		assertEquals(ActivityStatus.COMPLETED, completed.status());
+	}
 
 	@Test
 	void shouldStartActivityWithFixedClockAndPreserveDepartureScale() {
@@ -94,12 +181,7 @@ class UsageActivityUseCasesTest {
 						FIRST_SEAL,
 						new BigDecimal("15.14"),
 						ACTIVITY_LOCATION));
-		assertTrue(activityStore.completePendingAtomically(
-				SealNumber.of(FIRST_SEAL),
-				activity -> {
-					throw new AssertionError("no activity should have been stored");
-				})
-				.isEmpty());
+		assertTrue(activityStore.findPendingUsageActivities().isEmpty());
 	}
 
 	@Test
@@ -139,7 +221,7 @@ class UsageActivityUseCasesTest {
 						FIRST_SEAL,
 						new BigDecimal("15.14"),
 						invalidLocation));
-		assertEquals(0, storedActivityCount(FIRST_SEAL));
+		assertEquals(0, pendingActivityCount(FIRST_SEAL));
 
 		UsageActivityResult result = usageUseCasesAt(STARTED_AT.plusSeconds(60)).startUsageActivity(
 				FIRST_SEAL,
@@ -148,7 +230,7 @@ class UsageActivityUseCasesTest {
 
 		assertEquals(ActivityStatus.AWAITING_RETURN_WEIGHT, result.status());
 		assertEquals(ACTIVITY_LOCATION, result.activityLocation());
-		assertEquals(1, storedActivityCount(FIRST_SEAL));
+		assertEquals(1, pendingActivityCount(FIRST_SEAL));
 	}
 
 	@Test
@@ -177,7 +259,7 @@ class UsageActivityUseCasesTest {
 
 				assertEquals(1, successes);
 				assertEquals(1, pendingFailures);
-				assertEquals(1, storedActivityCount(FIRST_SEAL));
+				assertEquals(1, pendingActivityCount(FIRST_SEAL));
 			} finally {
 				start.countDown();
 				executor.shutdownNow();
@@ -482,33 +564,65 @@ class UsageActivityUseCasesTest {
 				clock);
 	}
 
-	private int storedActivityCount(String sealNumber) {
-		AtomicInteger count = new AtomicInteger();
-		assertThrows(InspectionCompleteException.class, () -> activityStore.startAtomically(
-				SealNumber.of(sealNumber),
-				activities -> {
-					count.set(activities.size());
-					throw new InspectionCompleteException();
-				}));
-		return count.get();
+	private int pendingActivityCount(String sealNumber) {
+		int count = 0;
+		for (UsageActivity activity : activityStore.findPendingUsageActivities()) {
+			if (activity.cylinder().sealNumber().equals(SealNumber.of(sealNumber))) {
+				count++;
+			}
+		}
+		return count;
 	}
 
 	private void assertPendingActivity(String sealNumber, BigDecimal departureGrossWeight) {
-		AtomicReference<UsageActivity> storedActivity = new AtomicReference<>();
-		assertThrows(InspectionCompleteException.class, () -> activityStore.startAtomically(
-				SealNumber.of(sealNumber),
-				activities -> {
-					assertEquals(1, activities.size());
-					storedActivity.set(activities.iterator().next());
-					throw new InspectionCompleteException();
-				}));
-		UsageActivity activity = storedActivity.get();
+		List<UsageActivity> matchingActivities = activityStore.findPendingUsageActivities()
+				.stream()
+				.filter(activity -> activity.cylinder().sealNumber().equals(SealNumber.of(sealNumber)))
+				.toList();
+		assertEquals(1, matchingActivities.size());
+		UsageActivity activity = matchingActivities.getFirst();
 		assertEquals(ActivityStatus.AWAITING_RETURN_WEIGHT, activity.status());
 		assertEquals(departureGrossWeight, activity.departureGrossWeight().inKilograms());
 		assertTrue(activity.returnGrossWeight().isEmpty());
 		assertTrue(activity.completedAt().isEmpty());
 		assertTrue(activity.consumedQuantity().isEmpty());
 		assertFalse(activity.zeroConsumptionConfirmed());
+	}
+
+	private static Set<String> sealNumbers(Collection<UsageActivityResult> results) {
+		Set<String> sealNumbers = new HashSet<>();
+		for (UsageActivityResult result : results) {
+			sealNumbers.add(result.sealNumber());
+		}
+		return sealNumbers;
+	}
+
+	private static UsageActivityResult resultForSeal(
+			Collection<UsageActivityResult> results,
+			String sealNumber) {
+		List<UsageActivityResult> matchingResults = results.stream()
+				.filter(result -> result.sealNumber().equals(sealNumber))
+				.toList();
+		assertEquals(1, matchingResults.size());
+		return matchingResults.getFirst();
+	}
+
+	private static void assertPendingResult(
+			UsageActivityResult result,
+			String sealNumber,
+			BigDecimal departureGrossWeight,
+			String activityLocation,
+			Instant startedAt) {
+		assertEquals(sealNumber, result.sealNumber());
+		assertEquals(departureGrossWeight, result.departureGrossWeight());
+		assertEquals(departureGrossWeight.scale(), result.departureGrossWeight().scale());
+		assertEquals(activityLocation, result.activityLocation());
+		assertEquals(startedAt, result.startedAt());
+		assertEquals(ActivityStatus.AWAITING_RETURN_WEIGHT, result.status());
+		assertTrue(result.returnGrossWeight().isEmpty());
+		assertTrue(result.completedAt().isEmpty());
+		assertTrue(result.consumedQuantity().isEmpty());
+		assertFalse(result.zeroConsumptionConfirmed());
 	}
 
 	private static Future<Boolean> concurrentStart(
@@ -541,6 +655,11 @@ class UsageActivityUseCasesTest {
 		}
 
 		@Override
+		public Collection<UsageActivity> findPendingUsageActivities() {
+			return delegate.findPendingUsageActivities();
+		}
+
+		@Override
 		public UsageActivity startAtomically(
 				SealNumber sealNumber,
 				Function<Collection<UsageActivity>, UsageActivity> startOperation) {
@@ -562,9 +681,6 @@ class UsageActivityUseCasesTest {
 		}
 	}
 
-	private static final class InspectionCompleteException extends RuntimeException {
-	}
-
 	private static final class UnreadableClock extends Clock {
 
 		@Override
@@ -579,7 +695,7 @@ class UsageActivityUseCasesTest {
 
 		@Override
 		public Instant instant() {
-			throw new AssertionError("clock must not be read for a rejected completion");
+			throw new AssertionError("clock must not be read");
 		}
 	}
 }
