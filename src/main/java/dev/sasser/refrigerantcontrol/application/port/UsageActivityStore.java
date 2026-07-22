@@ -11,6 +11,13 @@ import dev.sasser.refrigerantcontrol.domain.UsageActivity;
 public interface UsageActivityStore {
 
 	/**
+	 * Returns every pending activity as an unmodifiable collection of activities
+	 * detached from stored state. Returns an empty collection when none are pending;
+	 * iteration order is unspecified.
+	 */
+	Collection<UsageActivity> findPendingUsageActivities();
+
+	/**
 	 * Supplies all stored activities for the seal as an unmodifiable detached
 	 * collection, performs synchronous domain work once, and appends only after a
 	 * successful callback. The callback must not perform I/O, asynchronous work, or

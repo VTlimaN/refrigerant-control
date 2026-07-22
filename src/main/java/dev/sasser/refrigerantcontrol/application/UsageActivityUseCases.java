@@ -2,6 +2,9 @@ package dev.sasser.refrigerantcontrol.application;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 
 import dev.sasser.refrigerantcontrol.application.port.CylinderStore;
@@ -29,6 +32,15 @@ public final class UsageActivityUseCases {
 				"usage activity store must not be null");
 		this.clock = Objects.requireNonNull(clock, "clock must not be null");
 		this.usageActivityStarter = new UsageActivityStarter();
+	}
+
+	public Collection<UsageActivityResult> listPendingUsageActivities() {
+		Collection<UsageActivity> pendingActivities = usageActivityStore.findPendingUsageActivities();
+		List<UsageActivityResult> results = new ArrayList<>(pendingActivities.size());
+		for (UsageActivity activity : pendingActivities) {
+			results.add(UsageActivityResult.from(activity));
+		}
+		return List.copyOf(results);
 	}
 
 	public UsageActivityResult startUsageActivity(
