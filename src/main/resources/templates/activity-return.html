@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Registrar retorno | Controle de Gases Refrigerantes</title>
+	<link rel="stylesheet" href="/css/application.css" th:href="@{/css/application.css}">
+</head>
+<body>
+	<main class="page-shell">
+		<header class="page-header">
+			<a class="back-link" href="/" th:href="@{/}">Voltar ao início</a>
+			<p class="eyebrow">Operação de atividades</p>
+			<h1>Registrar retorno</h1>
+			<p>Informe o cilindro e o peso bruto de retorno para concluir a atividade pendente.</p>
+			<nav class="action-row" aria-label="Ações relacionadas">
+				<a class="button-link button-secondary" href="/cylinders" th:href="@{/cylinders}">Cadastrar cilindro</a>
+				<a class="button-link button-secondary" href="/activities/start" th:href="@{/activities/start}">Iniciar atividade</a>
+			</nav>
+		</header>
+
+		<div class="message message-success" role="status" th:if="${successMessage}" th:text="${successMessage}"></div>
+
+		<aside class="message message-warning" role="note">
+			Os dados cadastrados nesta etapa ficam apenas na memória e serão perdidos quando a aplicação for reiniciada.
+		</aside>
+
+		<div class="form-grid">
+			<section class="form-card" aria-labelledby="activity-return-title">
+				<h2 id="activity-return-title">Dados do retorno</h2>
+
+				<form method="post" action="/activities/return" th:action="@{/activities/return}"
+						th:object="${activityReturnForm}">
+					<div class="form-error-summary" role="alert" th:if="${#fields.hasGlobalErrors()}">
+						<p th:each="error : ${#fields.globalErrors()}" th:text="${error}"></p>
+					</div>
+
+					<div class="field-group">
+						<label for="return-seal-number">Número do lacre</label>
+						<input id="return-seal-number" type="text" required autocomplete="off"
+								th:field="*{sealNumber}"
+								th:attr="aria-describedby=${#fields.hasErrors('sealNumber')} ? 'sealNumber-error' : null,
+										aria-invalid=${#fields.hasErrors('sealNumber')}">
+						<p id="sealNumber-error" class="field-error" role="alert"
+								th:if="${#fields.hasErrors('sealNumber')}" th:errors="*{sealNumber}"></p>
+					</div>
+
+					<div class="field-group">
+						<label for="return-gross-weight">Peso bruto de retorno (kg)</label>
+						<div class="input-with-unit">
+							<input id="return-gross-weight" type="text" required inputmode="decimal" placeholder="15,140"
+									th:field="*{returnGrossWeight}"
+									th:attr="aria-describedby=${#fields.hasErrors('returnGrossWeight')}
+											? 'return-gross-weight-hint returnGrossWeight-error'
+											: 'return-gross-weight-hint',
+										aria-invalid=${#fields.hasErrors('returnGrossWeight')}">
+							<span aria-hidden="true">kg</span>
+						</div>
+						<p id="return-gross-weight-hint" class="field-hint">Use vírgula ou ponto como separador decimal.</p>
+						<p id="returnGrossWeight-error" class="field-error" role="alert"
+								th:if="${#fields.hasErrors('returnGrossWeight')}"
+								th:errors="*{returnGrossWeight}"></p>
+					</div>
+
+					<button type="submit">Concluir atividade</button>
+
+					<div class="message message-warning" role="alert" th:if="${zeroConsumptionConfirmationRequired}">
+						<p>O consumo calculado é zero. Deseja continuar?</p>
+						<button type="submit" name="confirmZeroConsumption" value="true">
+							Confirmar consumo zero e concluir
+						</button>
+					</div>
+				</form>
+			</section>
+
+			<section class="form-card" aria-labelledby="completed-activity-title" th:if="${completedActivity}">
+				<h2 id="completed-activity-title">Atividade concluída</h2>
+				<p><strong>Número do lacre:</strong> <span th:text="${completedActivity.sealNumber}"></span></p>
+				<p><strong>Local da atividade:</strong> <span th:text="${completedActivity.activityLocation}"></span></p>
+				<p><strong>Peso bruto de saída (kg):</strong>
+					<span th:text="${#strings.replace(completedActivity.departureGrossWeight.toPlainString(), '.', ',')}"></span>
+				</p>
+				<p><strong>Peso bruto de retorno (kg):</strong>
+					<span th:text="${#strings.replace(completedActivity.returnGrossWeight.orElseThrow().toPlainString(), '.', ',')}"></span>
+				</p>
+				<p><strong>Consumo (kg):</strong>
+					<span th:text="${#strings.replace(completedActivity.consumedQuantity.orElseThrow().toPlainString(), '.', ',')}"></span>
+				</p>
+				<p><strong>Situação:</strong> Atividade concluída</p>
+			</section>
+		</div>
+	</main>
+</body>
+</html>

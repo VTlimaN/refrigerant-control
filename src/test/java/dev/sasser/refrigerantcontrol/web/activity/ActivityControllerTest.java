@@ -91,6 +91,8 @@ class ActivityControllerTest {
 				.andExpect(content().string(containsString("Voltar ao início")))
 				.andExpect(content().string(containsString("href=\"/cylinders\"")))
 				.andExpect(content().string(containsString("Cadastrar cilindro")))
+				.andExpect(content().string(containsString("href=\"/activities/return\"")))
+				.andExpect(content().string(containsString("Registrar retorno")))
 				.andExpect(content().string(containsString("<form method=\"post\" action=\"/activities/start\">")))
 				.andExpect(content().string(containsString("for=\"activity-seal-number\">Número do lacre")))
 				.andExpect(content().string(containsString("id=\"activity-seal-number\"")))
@@ -110,7 +112,7 @@ class ActivityControllerTest {
 				.andExpect(content().string(not(containsString("type=\"date\""))))
 				.andExpect(content().string(not(containsString("type=\"time\""))))
 				.andExpect(content().string(not(containsString("type=\"datetime-local\""))))
-				.andExpect(content().string(not(containsString("/activities/return"))))
+				.andExpect(content().string(not(containsString("action=\"/activities/return\""))))
 				.andExpect(content().string(not(containsString("/activities/complete"))))
 				.andExpect(content().string(not(containsString("/activities/history"))))
 				.andExpect(content().string(not(containsString("/activities/list"))));

@@ -88,6 +88,18 @@ Pesos de retorno negativos e pesos de retorno maiores que o peso de saída agora
 
 Este marco altera somente o contrato interno de domínio, aplicação e armazenamento em memória. Ainda não existe rota, controller, formulário, template ou navegação para registrar o retorno. O armazenamento continua temporário na memória da JVM, e todos os dados são perdidos quando a aplicação ou seu contexto é reiniciado. Não há persistência, histórico, autenticação nem interface operacional de conclusão.
 
+## Milestone 2C.4B — Fluxo web de retorno e conclusão de atividade
+
+O retorno está disponível em `GET /activities/return`, com preenchimento opcional e exato do lacre pelo parâmetro `seal`. A página solicita somente o número do lacre e o peso bruto de retorno em quilogramas. O envio usa `POST /activities/return`, localiza a atividade pendente pelo lacre e delega sua conclusão atômica a `UsageActivityUseCases`.
+
+O lacre continua como texto livre obrigatório e é preservado exatamente, inclusive espaços externos e internos, capitalização, acentos, pontuação, barra e sinal de adição. O peso é recebido como texto, aceita vírgula ou ponto como separador decimal e é convertido diretamente para `BigDecimal`, mantendo o valor e a escala sem `double`, arredondamento ou `setScale`.
+
+Quando os pesos de saída e retorno são numericamente iguais, a primeira tentativa mantém a atividade pendente e apresenta no servidor uma confirmação explícita de consumo zero. Somente o botão de confirmação envia `confirmZeroConsumption=true`. A conclusão confirmada registra automaticamente `completedAt`, muda a situação para `COMPLETED` e calcula o consumo. Pesos negativos, retorno maior que a saída, cilindro inexistente e ausência de atividade pendente recebem mensagens fixas em português, sem expor detalhes técnicos.
+
+Depois de uma conclusão bem-sucedida, POST/Redirect/GET retorna à rota fixa e apresenta uma única vez o lacre, o local, os pesos brutos, o consumo e a situação em texto operacional. Uma atualização não repete a conclusão, e um novo envio para a mesma atividade informa que não existe atividade aguardando retorno. Os números são exibidos com vírgula e mantêm os zeros finais armazenados.
+
+O armazenamento continua somente na memória da JVM e todos os dados são perdidos após reiniciar a aplicação ou seu contexto. Ainda não há histórico ou listagem, persistência, autenticação, correção, cancelamento ou reabertura de atividades.
+
 ## Tecnologias
 
 ### Java 25
@@ -104,11 +116,11 @@ Spring Boot configura e inicia a aplicação Java. O plugin do Spring Boot tamb�
 
 ### Spring MVC
 
-Spring MVC recebe as requisições HTTP. Ele atende a página inicial, o status, o fluxo de cadastro em `/cylinders` e o início de atividade em `/activities/start`.
+Spring MVC recebe as requisições HTTP. Ele atende a página inicial, o status, o fluxo de cadastro em `/cylinders`, o início de atividade em `/activities/start` e o retorno em `/activities/return`.
 
 ### Thymeleaf
 
-Thymeleaf renderiza `home.html`, `cylinders.html` e `activity-start.html` no servidor. Os formulários preservam entradas válidas após erros e exibem mensagens escapadas por padrão.
+Thymeleaf renderiza `home.html`, `cylinders.html`, `activity-start.html` e `activity-return.html` no servidor. Os formulários preservam entradas válidas após erros e exibem mensagens escapadas por padrão.
 
 ### Tomcat embarcado
 
@@ -145,12 +157,13 @@ Arquivos importantes:
 - `dev.sasser.refrigerantcontrol.configuration`: raiz de composição que conecta as portas, os adaptadores, o relógio e os casos de uso ao Spring.
 - `dev.sasser.refrigerantcontrol.infrastructure.memory`: adaptadores em memória, não duráveis e independentes de Spring.
 - `dev.sasser.refrigerantcontrol.web.cylinder`: controller e formulários do cadastro operacional de cilindros.
-- `dev.sasser.refrigerantcontrol.web.activity`: controller e formulário do início de atividade.
+- `dev.sasser.refrigerantcontrol.web.activity`: controllers e formulários de início e retorno de atividade.
 - `dev.sasser.refrigerantcontrol.web.support`: conversão decimal compartilhada pelos fluxos web.
 - `application.properties`: nome visível da aplicação.
 - `home.html`: página inicial renderizada pelo Thymeleaf.
 - `cylinders.html`: página de cadastro de cilindro e peso bruto inicial.
 - `activity-start.html`: página de início de atividade.
+- `activity-return.html`: página de retorno, confirmação de consumo zero e conclusão de atividade.
 - `static/css/application.css`: estilos compartilhados, responsivos e sem framework externo.
 - `AGENTS.md`: regras permanentes para futuras sessões do Codex.
 
@@ -226,9 +239,10 @@ Abra o fluxo operacional no navegador em:
 ```text
 http://localhost:8080/cylinders
 http://localhost:8080/activities/start
+http://localhost:8080/activities/return
 ```
 
-Os formulários usam requisições `POST`; o navegador é a forma mais simples de verificar a renderização, a validação e os redirecionamentos dessas páginas. `POST /cylinders` cadastra o cilindro, `POST /cylinders/initial-weight` registra seu peso bruto inicial e `POST /activities/start` inicia a atividade.
+Os formulários usam requisições `POST`; o navegador é a forma mais simples de verificar a renderização, a validação e os redirecionamentos dessas páginas. `POST /cylinders` cadastra o cilindro, `POST /cylinders/initial-weight` registra seu peso bruto inicial, `POST /activities/start` inicia a atividade e `POST /activities/return` registra o peso bruto de retorno e conclui a atividade pendente.
 
 Confira o JSON de status:
 
@@ -265,6 +279,7 @@ java -jar target/refrigerant-control-0.0.1-SNAPSHOT.jar
 curl --fail http://localhost:8080/
 curl --fail http://localhost:8080/cylinders
 curl --fail http://localhost:8080/activities/start
+curl --fail http://localhost:8080/activities/return
 curl --fail http://localhost:8080/status
 ```
 
@@ -316,7 +331,6 @@ No estado atual do projeto ainda não existem:
 - garantia de unicidade global dos lacres entre processos ou instâncias diferentes dos adaptadores em memória;
 - dashboard;
 - cadastro editável de gases ou lista de cilindros;
-- interface de retorno, conclusão ou consumo de atividades;
 - histórico ou listagem de atividades;
 - conversão de datas para apresentação em `America/Sao_Paulo`;
 - ciclo de cilindro vazio, correção, cancelamento ou importação;
@@ -340,3 +354,5 @@ O Milestone 2C.3A demonstra como uma informação obrigatória atravessa agregad
 O Milestone 2C.3B demonstra como iniciar uma atividade por uma página server-rendered com apenas os dados que o operador precisa informar. O fluxo deriva o gás do cilindro, mantém tempo e situação sob responsabilidade da aplicação, compartilha o parser decimal entre controllers, aplica POST/Redirect/GET e apresenta um resumo escapado sem expor campos internos ou antecipar as interfaces de retorno, conclusão, consumo e histórico.
 
 O Milestone 2C.4A demonstra como uma confirmação operacional obrigatória atravessa agregado, caso de uso, resultado imutável e snapshot sem criar uma interface prematuramente. A conclusão continua atômica, falhas tipadas distinguem pesos negativos, retorno maior que saída e consumo zero não confirmado, e o `Clock` permanece a única origem de `completedAt`.
+
+O Milestone 2C.4B conecta esse contrato a uma página server-rendered com somente lacre e peso bruto de retorno. A confirmação de consumo zero aparece apenas quando necessária, o resultado usa POST/Redirect/GET, os valores decimais mantêm sua escala na apresentação e o controller permanece restrito a responsabilidades HTTP.
