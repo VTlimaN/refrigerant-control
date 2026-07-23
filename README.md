@@ -106,6 +106,14 @@ O armazenamento continua somente na memória da JVM e todos os dados são perdid
 
 O adaptador em memória observa um único snapshot coerente sob seu bloqueio existente. A ordem de iteração não é garantida. Esta etapa não adiciona rota, página, filtro, paginação, histórico ou persistência.
 
+## Milestone 2C.5B — Lista web de atividades pendentes
+
+A rota `GET /activities/pending` apresenta no servidor, com Thymeleaf, todas e somente as atividades que aguardam o peso bruto de retorno. A página reutiliza a consulta de aplicação do Milestone 2C.5A, exclui atividades concluídas e mostra apenas o lacre, o local da atividade e o peso bruto de saída em quilogramas, mantendo o valor decimal e seus zeros finais.
+
+Cada item oferece um link para o formulário existente em `/activities/return`, com o lacre exato codificado como parâmetro de URL e preenchido no formulário de retorno. A consulta por GET não altera dados, não apresenta `startedAt` e não garante ordem de exibição.
+
+Esta etapa não adiciona histórico, filtros, busca, paginação, persistência, JavaScript ou autenticação.
+
 ## Tecnologias
 
 ### Java 25
@@ -122,11 +130,11 @@ Spring Boot configura e inicia a aplicação Java. O plugin do Spring Boot tamb�
 
 ### Spring MVC
 
-Spring MVC recebe as requisições HTTP. Ele atende a página inicial, o status, o fluxo de cadastro em `/cylinders`, o início de atividade em `/activities/start` e o retorno em `/activities/return`.
+Spring MVC recebe as requisições HTTP. Ele atende a página inicial, o status, o fluxo de cadastro em `/cylinders`, o início de atividade em `/activities/start`, a lista pendente em `/activities/pending` e o retorno em `/activities/return`.
 
 ### Thymeleaf
 
-Thymeleaf renderiza `home.html`, `cylinders.html`, `activity-start.html` e `activity-return.html` no servidor. Os formulários preservam entradas válidas após erros e exibem mensagens escapadas por padrão.
+Thymeleaf renderiza `home.html`, `cylinders.html`, `activity-start.html`, `activity-pending.html` e `activity-return.html` no servidor. Os formulários preservam entradas válidas após erros e exibem mensagens escapadas por padrão.
 
 ### Tomcat embarcado
 
@@ -169,6 +177,7 @@ Arquivos importantes:
 - `home.html`: página inicial renderizada pelo Thymeleaf.
 - `cylinders.html`: página de cadastro de cilindro e peso bruto inicial.
 - `activity-start.html`: página de início de atividade.
+- `activity-pending.html`: página que lista atividades aguardando o peso bruto de retorno.
 - `activity-return.html`: página de retorno, confirmação de consumo zero e conclusão de atividade.
 - `static/css/application.css`: estilos compartilhados, responsivos e sem framework externo.
 - `AGENTS.md`: regras permanentes para futuras sessões do Codex.
@@ -245,6 +254,7 @@ Abra o fluxo operacional no navegador em:
 ```text
 http://localhost:8080/cylinders
 http://localhost:8080/activities/start
+http://localhost:8080/activities/pending
 http://localhost:8080/activities/return
 ```
 
@@ -285,6 +295,7 @@ java -jar target/refrigerant-control-0.0.1-SNAPSHOT.jar
 curl --fail http://localhost:8080/
 curl --fail http://localhost:8080/cylinders
 curl --fail http://localhost:8080/activities/start
+curl --fail http://localhost:8080/activities/pending
 curl --fail http://localhost:8080/activities/return
 curl --fail http://localhost:8080/status
 ```
@@ -337,7 +348,7 @@ No estado atual do projeto ainda não existem:
 - garantia de unicidade global dos lacres entre processos ou instâncias diferentes dos adaptadores em memória;
 - dashboard;
 - cadastro editável de gases ou lista de cilindros;
-- interface web de histórico ou de listagem de atividades;
+- interface web de histórico ou de listagem de atividades concluídas;
 - conversão de datas para apresentação em `America/Sao_Paulo`;
 - ciclo de cilindro vazio, correção, cancelamento ou importação;
 - identificação persistente de atividades, relatórios, backup ou exportação;
@@ -364,3 +375,5 @@ O Milestone 2C.4A demonstra como uma confirmação operacional obrigatória atra
 O Milestone 2C.4B conecta esse contrato a uma página server-rendered com somente lacre e peso bruto de retorno. A confirmação de consumo zero aparece apenas quando necessária, o resultado usa POST/Redirect/GET, os valores decimais mantêm sua escala na apresentação e o controller permanece restrito a responsabilidades HTTP.
 
 O Milestone 2C.5A demonstra como uma consulta de aplicação pode expor resultados imutáveis sem vazar agregados armazenados. O adaptador reconstrói atividades pendentes desvinculadas em um snapshot coerente, exclui as concluídas e mantém a ordem de iteração fora do contrato, sem antecipar uma interface web ou persistência.
+
+O Milestone 2C.5B conecta essa consulta a uma lista server-rendered com somente os dados necessários para identificar o cilindro e iniciar o retorno. O Thymeleaf codifica o lacre livre no link para o formulário existente, mantém a saída escapada e não transforma uma ordem incidental da coleção em regra de apresentação.
