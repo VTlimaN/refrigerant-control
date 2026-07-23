@@ -32,6 +32,8 @@ class HomeControllerTest {
 				.andExpect(content().string(containsString("href=\"/cylinders\"")))
 				.andExpect(content().string(containsString("href=\"/activities/start\"")))
 				.andExpect(content().string(containsString("Iniciar atividade")))
+				.andExpect(content().string(containsString("href=\"/activities/pending\"")))
+				.andExpect(content().string(containsString("Atividades pendentes")))
 				.andExpect(content().string(containsString("href=\"/activities/return\"")))
 				.andExpect(content().string(containsString("Registrar retorno")))
 				.andExpect(content().string(containsString("href=\"/status\"")));

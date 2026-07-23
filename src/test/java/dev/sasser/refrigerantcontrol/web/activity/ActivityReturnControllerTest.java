@@ -107,6 +107,8 @@ class ActivityReturnControllerTest {
 				.andExpect(content().string(containsString("Cadastrar cilindro")))
 				.andExpect(content().string(containsString("href=\"/activities/start\"")))
 				.andExpect(content().string(containsString("Iniciar atividade")))
+				.andExpect(content().string(containsString("href=\"/activities/pending\"")))
+				.andExpect(content().string(containsString("Atividades pendentes")))
 				.andExpect(content().string(containsString(
 						"<form method=\"post\" action=\"/activities/return\">")))
 				.andExpect(content().string(containsString("for=\"return-seal-number\">Número do lacre")))

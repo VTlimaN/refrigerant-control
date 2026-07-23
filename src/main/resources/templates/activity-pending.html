@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Atividades pendentes | Controle de Gases Refrigerantes</title>
+	<link rel="stylesheet" href="/css/application.css" th:href="@{/css/application.css}">
+</head>
+<body>
+	<main class="page-shell">
+		<header class="page-header">
+			<a class="back-link" href="/" th:href="@{/}">Voltar ao início</a>
+			<p class="eyebrow">Operação de atividades</p>
+			<h1>Atividades pendentes</h1>
+			<p>Consulte os cilindros que ainda aguardam o peso bruto de retorno.</p>
+			<nav class="action-row" aria-label="Ações relacionadas">
+				<a class="button-link button-secondary" href="/activities/start" th:href="@{/activities/start}">Iniciar atividade</a>
+			</nav>
+		</header>
+
+		<aside class="message message-warning" role="note">
+			Os dados cadastrados nesta etapa ficam apenas na memória e serão perdidos quando a aplicação for reiniciada.
+		</aside>
+
+		<section class="form-card" th:if="${pendingActivities.empty}">
+			<h2>Nenhuma atividade pendente</h2>
+			<p>Nenhuma atividade está aguardando o peso bruto de retorno.</p>
+		</section>
+
+		<section th:unless="${pendingActivities.empty}">
+			<h2>Atividades aguardando retorno</h2>
+			<ul class="form-grid activity-list">
+				<li class="form-card" th:each="activity : ${pendingActivities}">
+					<article>
+						<h3 th:text="|Cilindro ${activity.sealNumber}|">Cilindro</h3>
+						<p><strong>Número do lacre:</strong> <span th:text="${activity.sealNumber}"></span></p>
+						<p><strong>Local da atividade:</strong> <span th:text="${activity.activityLocation}"></span></p>
+						<p><strong>Peso bruto de saída (kg):</strong>
+							<span th:text="${#strings.replace(activity.departureGrossWeight.toPlainString(), '.', ',')}"></span>
+						</p>
+						<a class="button-link button-primary" href="/activities/return"
+								th:href="@{/activities/return(seal=${activity.sealNumber})}"
+								th:text="|Registrar retorno do cilindro ${activity.sealNumber}|">
+							Registrar retorno do cilindro
+						</a>
+					</article>
+				</li>
+			</ul>
+		</section>
+	</main>
+</body>
+</html>

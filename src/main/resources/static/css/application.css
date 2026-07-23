@@ -148,6 +148,20 @@ button:hover {
 	margin-top: 1.5rem;
 }
 
+.activity-list {
+	margin-bottom: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.activity-list h3 {
+	margin-top: 0;
+}
+
+.activity-list p {
+	overflow-wrap: anywhere;
+}
+
 .form-card {
 	padding: clamp(1.25rem, 3vw, 2rem);
 }
